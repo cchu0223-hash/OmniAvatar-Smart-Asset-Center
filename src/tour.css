@@ -1,0 +1,184 @@
+/* ══════════════════════════════════════════════════
+   Onboarding Tour — Glassmorphism Dark 3D Style
+   Requires driver.js v1.x  (.driver-popover class)
+   ══════════════════════════════════════════════════ */
+
+/* ── Arrow breath float animation ── */
+@keyframes tour-arrow-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+
+/* ── Popover container ── */
+.driverjs-glass-tour {
+  background: rgba(20, 20, 25, 0.72) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 24px 64px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  padding: 0 !important;
+  min-width: 280px !important;
+  max-width: 340px !important;
+  color: #fff !important;
+  overflow: hidden !important;
+}
+
+/* Top neon accent line */
+.driverjs-glass-tour::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 240, 255, 0.6) 50%, transparent 100%);
+  margin-bottom: 0;
+}
+
+/* ── Custom header row (progress badge + skip btn) ── */
+.tour-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 0;
+  gap: 8px;
+}
+
+.tour-progress-badge {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Inter', monospace;
+  letter-spacing: 0.5px;
+  color: rgba(0, 240, 255, 0.9);
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.tour-skip-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(180, 190, 210, 0.7);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tour-skip-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Title ── */
+.driverjs-glass-tour .driver-popover-title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  padding: 10px 16px 0 !important;
+  margin: 0 !important;
+  line-height: 1.4 !important;
+  background: none !important;
+  border: none !important;
+}
+
+/* ── Description ── */
+.driverjs-glass-tour .driver-popover-description {
+  font-size: 13px !important;
+  color: rgba(190, 205, 225, 0.88) !important;
+  padding: 8px 16px 0 !important;
+  margin: 0 !important;
+  line-height: 1.65 !important;
+  background: none !important;
+}
+
+/* ── Footer ── */
+.driverjs-glass-tour .driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0 !important;
+  padding: 14px 16px 16px !important;
+  margin-top: 12px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+  background: none !important;
+}
+
+.driverjs-glass-tour .driver-popover-footer-buttons {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+/* Built-in progress text — hide it (we use our own badge) */
+.driverjs-glass-tour .driver-popover-progress-text {
+  display: none !important;
+}
+
+/* ── Previous button ── */
+.driverjs-glass-tour .driver-popover-prev-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(190, 205, 225, 0.85) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  font-family: inherit !important;
+  padding: 7px 16px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: background 0.2s, color 0.2s !important;
+  text-shadow: none !important;
+}
+.driverjs-glass-tour .driver-popover-prev-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+/* ── Next / Done button ── */
+.driverjs-glass-tour .driver-popover-next-btn {
+  background: linear-gradient(135deg, #00c8ff 0%, #7000ff 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  font-family: inherit !important;
+  padding: 7px 18px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: box-shadow 0.2s, transform 0.15s !important;
+  box-shadow: 0 3px 14px rgba(112, 0, 255, 0.4) !important;
+  text-shadow: none !important;
+}
+.driverjs-glass-tour .driver-popover-next-btn:hover {
+  box-shadow: 0 4px 20px rgba(0, 200, 255, 0.5) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── Hide built-in close button (we inject a custom skip btn) ── */
+.driverjs-glass-tour .driver-popover-close-btn {
+  display: none !important;
+}
+
+/* ── Arrow (breathing float animation) ── */
+.driverjs-glass-tour .driver-popover-arrow {
+  animation: tour-arrow-float 2.4s ease-in-out infinite !important;
+}
+
+/* Arrow color — match border */
+.driverjs-glass-tour .driver-popover-arrow-side-top::before,
+.driverjs-glass-tour .driver-popover-arrow-side-top::after,
+.driverjs-glass-tour .driver-popover-arrow-side-bottom::before,
+.driverjs-glass-tour .driver-popover-arrow-side-bottom::after,
+.driverjs-glass-tour .driver-popover-arrow-side-left::before,
+.driverjs-glass-tour .driver-popover-arrow-side-left::after,
+.driverjs-glass-tour .driver-popover-arrow-side-right::before,
+.driverjs-glass-tour .driver-popover-arrow-side-right::after {
+  border-color: rgba(255, 255, 255, 0.15) transparent transparent transparent !important;
+}
