@@ -117,6 +117,13 @@ function ProfessionalEditPage() {
   const [videoPopover, setVideoPopover] = useState<'ratio' | 'model' | null>(null)
   const [videoDuration, setVideoDuration] = useState(5)
 
+  // Smart materials state
+  const [smartMaterials, setSmartMaterials] = useState<SmartMaterial[]>(SMART_MATERIALS)
+
+  const handleDeleteSmartMaterial = (id: number) => {
+    setSmartMaterials(prev => prev.filter(m => m.id !== id))
+  }
+
   // Lightbox for smart material preview
   const [lightboxItem, setLightboxItem] = useState<SmartMaterial | null>(null)
 
@@ -489,7 +496,7 @@ function ProfessionalEditPage() {
           <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>我的智能素材</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {SMART_MATERIALS.filter(m => m.type === 'image').map((item) => (
+          {smartMaterials.filter(m => m.type === 'image').map((item) => (
             <div
               key={item.id}
               className="relative aspect-square overflow-hidden cursor-pointer group"
@@ -509,6 +516,9 @@ function ProfessionalEditPage() {
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); showToast('已开始下载') }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="下载">
                   <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>download</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleDeleteSmartMaterial(item.id) }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="删除">
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>delete</span>
                 </button>
               </div>
             </div>
@@ -654,7 +664,7 @@ function ProfessionalEditPage() {
           <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>我的智能素材</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {SMART_MATERIALS.filter(m => m.type === 'video').map((item) => (
+          {smartMaterials.filter(m => m.type === 'video').map((item) => (
             <div
               key={item.id}
               className="relative aspect-video overflow-hidden cursor-pointer group"
@@ -688,6 +698,9 @@ function ProfessionalEditPage() {
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); showToast('已开始下载') }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="下载">
                   <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>download</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleDeleteSmartMaterial(item.id) }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="删除">
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>delete</span>
                 </button>
               </div>
               {/* Prompt label at bottom */}

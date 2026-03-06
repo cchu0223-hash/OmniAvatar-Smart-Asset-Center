@@ -61,6 +61,8 @@ function App() {
   const [hasMoreHistory, setHasMoreHistory] = useState(true)
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([])
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null)
+  const [hoveredImageKey, setHoveredImageKey] = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<{ url: string; prompt: string } | null>(null)
   // Feed tab & search
   const [feedTab, setFeedTab] = useState<'recommend' | 'mine'>('recommend')
   const [searchQuery, setSearchQuery] = useState('')
@@ -295,6 +297,10 @@ function App() {
     setTimeout(() => startNextTask(taskId), 500)
   }
 
+  const handleDeleteTask = (taskId: string) => {
+    setTaskQueue(prev => prev.filter(t => t.id !== taskId))
+    if (selectedWorkId === taskId) setSelectedWorkId(null)
+  }
 
   return (
     <>
@@ -823,12 +829,51 @@ function App() {
                                 }`}
                               >
                                 {/* 4 images in a row */}
-                                <div className="grid grid-cols-4 gap-2">
-                                  {task.thumbnails.map((thumb, i) => (
-                                    <div key={i} className="rounded-lg overflow-hidden border border-white/5 group/img">
-                                      <img src={thumb} alt={`${task.prompt} #${i + 1}`} className="w-full aspect-square object-cover transition-transform duration-300 group-hover/img:scale-105" loading="lazy" />
-                                    </div>
-                                  ))}
+                                <div className="grid grid-cols-4 gap-2" onMouseLeave={() => setHoveredImageKey(null)}>
+                                  {task.thumbnails.map((thumb, i) => {
+                                    const key = `${task.id}-${i}`
+                                    const isHovered = hoveredImageKey === key
+                                    return (
+                                      <div
+                                        key={i}
+                                        className="relative rounded-lg overflow-hidden border border-white/5 cursor-pointer"
+                                        onMouseEnter={() => setHoveredImageKey(key)}
+                                        onMouseLeave={() => setHoveredImageKey(null)}
+                                        onClick={(e) => { e.stopPropagation(); setImagePreview({ url: thumb, prompt: task.prompt }) }}
+                                      >
+                                        <img
+                                          src={thumb}
+                                          alt={`${task.prompt} #${i + 1}`}
+                                          className={`w-full aspect-square object-cover transition-transform duration-300 ${isHovered ? 'scale-105' : ''}`}
+                                          loading="lazy"
+                                        />
+                                        {isHovered && (
+                                          <>
+                                            {/* Top-right: bookmark */}
+                                            <div className="absolute top-1 right-1">
+                                              <button
+                                                onClick={(e) => { e.stopPropagation() }}
+                                                className="w-6 h-6 flex items-center justify-center rounded-md bg-black/60 backdrop-blur-sm hover:bg-accent-purple/70 transition-colors"
+                                                aria-label="收藏至我的素材"
+                                              >
+                                                <span className="material-symbols-outlined text-white" style={{ fontSize: '13px' }}>bookmark_add</span>
+                                              </button>
+                                            </div>
+                                            {/* Bottom-right: download */}
+                                            <div className="absolute bottom-1 right-1">
+                                              <button
+                                                onClick={(e) => { e.stopPropagation() }}
+                                                className="w-6 h-6 flex items-center justify-center rounded-md bg-black/60 backdrop-blur-sm hover:bg-accent-cyan/70 transition-colors"
+                                                aria-label="下载"
+                                              >
+                                                <span className="material-symbols-outlined text-white" style={{ fontSize: '13px' }}>download</span>
+                                              </button>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
                                 </div>
                                 {/* Prompt */}
                                 <p className="text-xs text-slate-300 mt-3 line-clamp-2 leading-relaxed">{task.prompt}</p>
@@ -875,11 +920,11 @@ function App() {
                                     再次生成
                                   </button>
                                   <button
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 text-[10px] text-slate-400 hover:bg-accent-purple/10 hover:text-accent-purple transition-all"
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 text-[10px] text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all ml-auto"
                                   >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>bookmark_add</span>
-                                    收藏为我的素材
+                                    <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>delete</span>
+                                    删除
                                   </button>
                                 </div>
                               </div>
@@ -953,11 +998,11 @@ function App() {
                                         再次生成
                                       </button>
                                       <button
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 hover:bg-accent-purple/10 hover:text-accent-purple transition-all"
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all ml-auto"
                                       >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bookmark_add</span>
-                                        收藏为我的素材
+                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                                        删除
                                       </button>
                                     </div>
                                   </div>
@@ -977,6 +1022,13 @@ function App() {
                                     <p className="text-[10px] text-red-400/60 mt-1">生成失败</p>
                                   </div>
                                   <span className="text-[10px] text-slate-600">{formatSubmitTime(task.createdAt)}</span>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                                    aria-label="删除"
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>delete</span>
+                                  </button>
                                 </div>
                               </div>
                             )
@@ -1065,6 +1117,40 @@ function App() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Single-image preview lightbox */}
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[2001] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setImagePreview(null)}
+          role="dialog"
+          aria-label="查看大图"
+          style={{ animation: 'lightbox-fade-in 0.2s ease-out' }}
+        >
+          <div
+            className="relative max-w-3xl max-h-[85vh] w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setImagePreview(null)}
+              className="absolute -top-10 right-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/20 transition-colors z-10"
+              aria-label="关闭"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+            </button>
+            <div className="rounded-2xl overflow-hidden border border-white/10">
+              <img
+                src={imagePreview.url}
+                alt={imagePreview.prompt}
+                className="w-full max-h-[70vh] object-contain bg-black/40"
+              />
+              <div className="p-4 bg-[#0D0E14]/90">
+                <p className="text-sm text-slate-300 line-clamp-2">{imagePreview.prompt}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
