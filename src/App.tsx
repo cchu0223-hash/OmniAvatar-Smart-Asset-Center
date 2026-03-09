@@ -1,7 +1,9 @@
 // Styles are in index.html
 
 import { useState, useEffect, useRef } from 'react'
+import TextType from './TextType'
 import { useNavigate } from 'react-router-dom'
+import { useTour } from './useTour'
 
 type GenerationCategory = 'image' | 'video'
 type AspectRatio = '1:1' | '3:4' | '4:3' | '16:9' | '9:16'
@@ -49,6 +51,51 @@ const formatSubmitTime = (ts: number): string => {
 
 function App() {
   const navigate = useNavigate()
+
+  // ── Onboarding Tour (首页 3 步引导) ──
+  useTour(
+    'home-main',
+    [
+      {
+        element: '#tour-category-capsules',
+        popover: {
+          title: '选择素材类型',
+          description: '点击选择您需要的素材类型。',
+          side: 'bottom',
+          align: 'start',
+        },
+      },
+      {
+        element: '#tour-params-bar',
+        popover: {
+          title: '调整素材格式',
+          description: '在这里调整您需要的素材格式。',
+          side: 'bottom',
+          align: 'start',
+        },
+      },
+      {
+        element: '#tour-my-tab',
+        popover: {
+          title: '查看历史任务',
+          description: '在这里可以查看您历史提交的生成任务，并支持重新编辑生成或收藏至素材。',
+          side: 'bottom',
+          align: 'center',
+        },
+      },
+      {
+        element: '#tour-credits',
+        popover: {
+          title: '算力中心',
+          description: '生成素材需要消耗算力，您可点击这里进行查看或充值。',
+          side: 'bottom',
+          align: 'end',
+        },
+      },
+    ],
+    { delay: 800 },
+  )
+
   const [category, setCategory] = useState<GenerationCategory>('image')
   const [activePopup, setActivePopup] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<string>('Flux Pro')
@@ -323,7 +370,7 @@ function App() {
             <h2 className="text-lg font-semibold tracking-wide text-white/90">讯飞智作</h2>
           </div>
           <div className="flex items-center gap-5">
-            <div className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner">
+            <div id="tour-credits" className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined text-sm mr-2 text-accent-cyan" style={{ fontVariationSettings: '"FILL" 1' }}>bolt</span>
               <span className="text-xs font-semibold text-slate-300 tracking-wide">算力: <span className="text-white">1280</span></span>
             </div>
@@ -340,7 +387,15 @@ function App() {
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent-cyan/5 blur-[100px] rounded-full pointer-events-none"></div>
             <h1 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight flex items-center justify-center flex-wrap gap-x-3">
               <span className="bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent drop-shadow-sm whitespace-nowrap">开启您的企业级</span>
-              <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent text-glow whitespace-nowrap">高质量 AI 创作</span>
+              <TextType
+                text={['高质量 AI 创作', '沉浸式视频生成', '智能内容生产']}
+                typingSpeed={120}
+                deletingSpeed={80}
+                pauseDuration={3000}
+                loop={true}
+                className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent text-glow whitespace-nowrap"
+                cursorClassName="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent"
+              />
             </h1>
             <p className="text-slate-400 text-lg font-light tracking-wide max-w-2xl mx-auto">从图片生成到视频创作，AI 驱动的一站式内容生产平台</p>
           </div>
@@ -405,9 +460,9 @@ function App() {
                 </div>
 
                 {/* Capsule Control Bar */}
-                <div ref={controlBarRef} className="flex flex-wrap items-center gap-3 pt-2">
+                <div ref={controlBarRef} id="tour-params-bar" className="flex flex-wrap items-center gap-3 pt-2">
                   {/* Left Zone: Category Capsules */}
-                  <div className="flex items-center bg-white/[0.03] rounded-xl border border-white/5 p-1">
+                  <div id="tour-category-capsules" className="flex items-center bg-white/[0.03] rounded-xl border border-white/5 p-1">
                     <button
                       onClick={() => setCategory('image')}
                       className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -605,6 +660,7 @@ function App() {
                   )}
                 </button>
                 <button
+                  id="tour-my-tab"
                   role="tab"
                   aria-selected={feedTab === 'mine'}
                   onClick={() => setFeedTab('mine')}
@@ -824,10 +880,20 @@ function App() {
                               <div
                                 key={task.id}
                                 onClick={() => setSelectedWorkId(task.id)}
-                                className={`rounded-xl border p-4 cursor-pointer transition-all ${
+                                className={`relative group/card rounded-xl border p-4 cursor-pointer transition-all ${
                                   selectedWorkId === task.id ? 'border-accent-cyan/30 bg-white/[0.04] shadow-[0_0_12px_rgba(0,240,255,0.08)]' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.03]'
                                 }`}
                               >
+                                {/* 前往专业剪辑 hover 按钮 */}
+                                <div className="absolute top-3 right-3 z-10 flex items-center overflow-hidden rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); navigate('/professional-edit') }}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] text-slate-300 hover:text-white hover:bg-white/10 transition-colors whitespace-nowrap"
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>movie_edit</span>
+                                    前往专业剪辑
+                                  </button>
+                                </div>
                                 {/* 4 images in a row */}
                                 <div className="grid grid-cols-4 gap-2" onMouseLeave={() => setHoveredImageKey(null)}>
                                   {task.thumbnails.map((thumb, i) => {
@@ -937,10 +1003,20 @@ function App() {
                               <div
                                 key={task.id}
                                 onClick={() => setSelectedWorkId(task.id)}
-                                className={`rounded-xl border overflow-hidden cursor-pointer transition-all group ${
+                                className={`relative group/card rounded-xl border overflow-hidden cursor-pointer transition-all group ${
                                   selectedWorkId === task.id ? 'border-accent-cyan/30 bg-white/[0.04] shadow-[0_0_12px_rgba(0,240,255,0.08)]' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.03]'
                                 }`}
                               >
+                                {/* 前往专业剪辑 hover 按钮 */}
+                                <div className="absolute top-3 right-3 z-10 flex items-center overflow-hidden rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); navigate('/professional-edit') }}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] text-slate-300 hover:text-white hover:bg-white/10 transition-colors whitespace-nowrap"
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>movie_edit</span>
+                                    前往专业剪辑
+                                  </button>
+                                </div>
                                 <div className="flex">
                                   <div className="relative overflow-hidden w-72 flex-shrink-0">
                                     <img src={task.thumbnail} alt={task.prompt} className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -996,6 +1072,13 @@ function App() {
                                       >
                                         <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>refresh</span>
                                         再次生成
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation() }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 hover:bg-accent-purple/10 hover:text-accent-purple transition-all"
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bookmark_add</span>
+                                        收藏至素材
                                       </button>
                                       <button
                                         onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}

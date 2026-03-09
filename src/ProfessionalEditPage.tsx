@@ -182,55 +182,63 @@ function ProfessionalEditPage() {
     'professional-edit',
     [
       {
-        element: '#track-clip-01',
+        element: '#tour-material-panel',
         popover: {
-          title: '轨道片段操作',
-          description: '右键点击该轨道片段，即可解锁更多高级 AI 功能。',
-          side: 'top',
+          title: '素材模块',
+          description: '在当前模块可以上传本地素材或者智能生成素材。',
+          side: 'right',
           align: 'start',
         },
       },
       {
-        element: '#ctx-menu-lip-sync',
+        element: '#tour-smart-material-tab',
         popover: {
-          title: '视频人物对口型',
-          description: 'AI 重绘人物口部动作并生成多语种配音。',
-          side: 'left',
+          title: '智能素材',
+          description: '支持生成视频 / 图片。',
+          side: 'right',
           align: 'center',
         },
       },
       {
-        element: '#ctx-menu-multimodal',
+        element: '#tour-my-smart-materials',
         popover: {
-          title: '视频多模态拆分',
-          description: 'AI 解析视频元素，拆分画面、人声和背景声。',
-          side: 'left',
+          title: '我的智能素材',
+          description: '支持在这里查看历史生成素材和素材中心收藏的素材。',
+          side: 'right',
+          align: 'start',
+        },
+      },
+      {
+        element: '#tour-credits',
+        popover: {
+          title: '算力中心',
+          description: '生成素材需要消耗算力，您可点击这里进行查看或充值。',
+          side: 'bottom',
           align: 'center',
         },
       },
     ],
     {
       delay: 1200,
-      // Step 0: listen for right-click on clip01 → auto-advance
+      // Step 0: 点击"智能素材" Tab 后自动进入步骤2
       stepHooks: {
         0: {
           onActive: (driverObj) => {
-            const clip = document.getElementById('track-clip-01')
+            const btn = document.getElementById('tour-smart-material-tab')
             const handler = () => {
-              // Context menu is already being opened by React's onContextMenu handler.
-              // Wait a frame for React to render it, then advance.
               setTimeout(() => driverObj.moveNext(), 150)
-              clip?.removeEventListener('contextmenu', handler)
+              btn?.removeEventListener('click', handler)
             }
-            clip?.addEventListener('contextmenu', handler)
-            return () => clip?.removeEventListener('contextmenu', handler)
+            btn?.addEventListener('click', handler)
+            return () => btn?.removeEventListener('click', handler)
           },
         },
       },
-      // Step 0: if user clicks "Next" without right-clicking, open context menu first
       onNextAtStep: {
         0: (driverObj) => {
-          openContextMenuRef.current()
+          // 确保切换到智能素材 Tab
+          const btn = document.getElementById('tour-smart-material-tab') as HTMLButtonElement | null
+          btn?.click()
           setTimeout(() => driverObj.moveNext(), 180)
         },
       },
@@ -486,11 +494,11 @@ function ProfessionalEditPage() {
           <span className="material-symbols-outlined text-base" aria-hidden="true">image</span>
           立即生图
         </button>
-        <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>预计消耗 10 算力</span>
+        <span id="tour-credits" className="text-[10px] cursor-pointer hover:text-purple-400 transition-colors" style={{ color: 'rgba(148,163,184,0.3)' }}>预计消耗 10 算力</span>
       </div>
 
       {/* ── 我的智能素材 ── */}
-      <div className="flex flex-col" style={{ gap: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <div id="tour-my-smart-materials" className="flex flex-col" style={{ gap: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="flex items-center gap-1.5">
           <span className="material-symbols-outlined text-sm" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">folder_special</span>
           <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>我的智能素材</span>
@@ -772,10 +780,10 @@ function ProfessionalEditPage() {
         </aside>
 
         {/* ── Left Panel ── */}
-        <aside className="w-72 flex flex-col border-r shrink-0 overflow-hidden" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
+        <aside id="tour-material-panel" className="w-72 flex flex-col border-r shrink-0 overflow-hidden" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
           <div className="flex border-b shrink-0" style={{ borderColor: '#222226' }}>
             {(['本地素材', '智能素材'] as MaterialTab[]).map((tab) => (
-              <button key={tab} onClick={() => setMaterialTab(tab)} className="flex-1 py-3 text-xs font-medium transition-colors" style={{ color: materialTab === tab ? '#0066FF' : 'rgba(148,163,184,0.6)', borderBottom: materialTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: materialTab === tab ? 700 : 500 }}>{tab}</button>
+              <button key={tab} id={tab === '智能素材' ? 'tour-smart-material-tab' : undefined} onClick={() => setMaterialTab(tab)} className="flex-1 py-3 text-xs font-medium transition-colors" style={{ color: materialTab === tab ? '#0066FF' : 'rgba(148,163,184,0.6)', borderBottom: materialTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: materialTab === tab ? 700 : 500 }}>{tab}</button>
             ))}
           </div>
           {materialTab === '智能素材' && (
