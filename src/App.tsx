@@ -124,6 +124,8 @@ function App() {
   // ActionDock auto-hide after all tasks complete
   const [showDock, setShowDock] = useState(true)
 
+  const [showAnnounceModal, setShowAnnounceModal] = useState(true)
+
   const controlBarRef = useRef<HTMLDivElement>(null)
   const taskIdCounter = useRef(0)
 
@@ -352,6 +354,54 @@ function App() {
 
   return (
     <>
+      {/* ── 新功能发布弹窗 ── */}
+      {showAnnounceModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}>
+          <div className="relative w-[480px] rounded-3xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#f5f6f8' }}>
+            {/* Badge + Close */}
+            <div className="absolute top-4 left-4 z-10">
+              <span className="text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.18)', color: '#fff', backdropFilter: 'blur(4px)' }}>新功能发布</span>
+            </div>
+            <button onClick={() => setShowAnnounceModal(false)} className="absolute top-4 right-4 z-10 w-7 h-7 flex items-center justify-center rounded-full transition-colors" style={{ backgroundColor: 'rgba(0,0,0,0.18)', color: '#fff', backdropFilter: 'blur(4px)' }} aria-label="关闭">
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+            </button>
+            {/* Hero video */}
+            <div className="w-full overflow-hidden rounded-t-3xl" style={{ aspectRatio: '16/9' }}>
+              <video
+                src="/announce-hero.mp4"
+                className="w-full h-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            </div>
+            {/* Content */}
+            <div className="px-7 pt-5 pb-7">
+              <h2 className="text-[22px] font-bold mb-2" style={{ color: '#111827' }}>AI素材生成全面上新</h2>
+              <p className="text-sm mb-4" style={{ color: '#6b7280' }}>一键即可 AI 生成图片与视频，告别找素材难题，让创作更高效。</p>
+              <ul className="flex flex-col gap-2 mb-6">
+                {['轻松生成符合品牌风格的图片与视频', '智能匹配素材，提升创作效率'].map(t => (
+                  <li key={t} className="flex items-center gap-2 text-sm" style={{ color: '#374151' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#4f46e5' }}>check_circle</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { setShowAnnounceModal(false); navigate('/professional-edit') }}
+                  className="px-7 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
+                  style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)', boxShadow: '0 4px 16px rgba(79,70,229,0.4)' }}
+                >
+                  立即体验
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Background Effects */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="shape-blob w-[500px] h-[500px] bg-purple-900/30 rounded-full top-[-10%] right-[-5%]"></div>
@@ -376,6 +426,11 @@ function App() {
               <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>movie_edit</span>
               专业剪辑
             </button>
+            <div className="h-4 w-px bg-white/10" />
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(0,102,255,0.08)', border: '1px solid rgba(0,102,255,0.2)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#60a5fa' }}>auto_awesome</span>
+              <span className="text-xs font-medium" style={{ color: '#60a5fa' }}>AI素材生成</span>
+            </div>
           </div>
           <div className="flex items-center gap-5">
             <div id="tour-credits" className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-colors">

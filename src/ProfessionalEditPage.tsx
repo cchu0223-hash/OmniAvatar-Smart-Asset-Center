@@ -10,7 +10,7 @@ type OptimizeTab = '素材更换' | '素材编辑' | '动画效果'
 type OptimizeReplaceSubTab = '图片生成' | '视频生成'
 type AnimSubTab = '入场动画' | '出场动画'
 type TrackClip = { id: string; label: string; imageUrl: string; prompt: string; ratio: ImageRatio; model: ImageModel; resolution: ImageResolution; isLocal?: boolean }
-type MaterialTab = '本地素材' | '智能素材'
+type MaterialTab = '本地素材' | 'AI素材'
 type GenerateTab = '图片生成' | '视频生成'
 type LocalFilter = '全部' | '视频' | '图片' | '音频'
 type ImageRatio = '16:9 宽屏' | '9:16 竖屏' | '4:3' | '1:1 方形'
@@ -107,7 +107,7 @@ function ProfessionalEditPage() {
 
   // ── Sidebar / panel state ──
   const [activeTool, setActiveTool] = useState<SidebarTool>('我的素材')
-  const [materialTab, setMaterialTab] = useState<MaterialTab>('智能素材')
+  const [materialTab, setMaterialTab] = useState<MaterialTab>('AI素材')
   const [generateTab, setGenerateTab] = useState<GenerateTab>('图片生成')
   const [localFilter, setLocalFilter] = useState<LocalFilter>('全部')
 
@@ -263,7 +263,7 @@ function ProfessionalEditPage() {
         element: '#tour-material-panel',
         popover: {
           title: '素材模块',
-          description: '在当前模块可以上传本地素材或者智能生成素材。',
+          description: '在当前模块可以上传本地素材或使用 AI 素材生成。',
           side: 'right',
           align: 'start',
         },
@@ -271,7 +271,7 @@ function ProfessionalEditPage() {
       {
         element: '#tour-smart-material-tab',
         popover: {
-          title: '智能素材',
+          title: 'AI素材',
           description: '支持生成视频 / 图片。',
           side: 'right',
           align: 'center',
@@ -280,7 +280,7 @@ function ProfessionalEditPage() {
       {
         element: '#tour-my-smart-materials',
         popover: {
-          title: '我的智能素材',
+          title: '我的AI素材',
           description: '支持在这里查看历史生成素材和素材中心收藏的素材。',
           side: 'right',
           align: 'start',
@@ -298,7 +298,7 @@ function ProfessionalEditPage() {
     ],
     {
       delay: 1200,
-      // Step 0: 点击"智能素材" Tab 后自动进入步骤2
+      // Step 0: 点击"AI素材" Tab 后自动进入步骤2
       stepHooks: {
         0: {
           onActive: (driverObj) => {
@@ -314,7 +314,7 @@ function ProfessionalEditPage() {
       },
       onNextAtStep: {
         0: (driverObj) => {
-          // 确保切换到智能素材 Tab
+          // 确保切换到AI素材 Tab
           const btn = document.getElementById('tour-smart-material-tab') as HTMLButtonElement | null
           btn?.click()
           setTimeout(() => driverObj.moveNext(), 180)
@@ -596,7 +596,7 @@ function ProfessionalEditPage() {
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid #222226', color: 'rgba(203,213,225,0.9)' }}
                 onFocus={e => { e.currentTarget.style.borderColor = '#0066FF' }}
                 onBlur={e => { e.currentTarget.style.borderColor = '#222226' }}
-                aria-label="搜索智能素材"
+                aria-label="搜索AI素材"
               />
             </div>
             <div className="flex gap-1">
@@ -942,7 +942,7 @@ function ProfessionalEditPage() {
             style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid #222226', color: 'rgba(203,213,225,0.9)' }}
             onFocus={e => { e.currentTarget.style.borderColor = '#0066FF' }}
             onBlur={e => { e.currentTarget.style.borderColor = '#222226' }}
-            aria-label="搜索智能素材"
+            aria-label="搜索AI素材"
           />
         </div>
         <div className="flex gap-1">
@@ -1084,8 +1084,8 @@ function ProfessionalEditPage() {
               ) : (
                 <>
                   <div className="flex border-b shrink-0" style={{ borderColor: '#222226' }}>
-                    {(['本地素材', '智能素材'] as MaterialTab[]).map((tab) => (
-                      <button key={tab} id={tab === '智能素材' ? 'tour-smart-material-tab' : undefined} onClick={() => setMaterialTab(tab)} className="flex-1 py-3 text-xs font-medium transition-colors" style={{ color: materialTab === tab ? '#0066FF' : 'rgba(148,163,184,0.6)', borderBottom: materialTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: materialTab === tab ? 700 : 500 }}>{tab}</button>
+                    {(['本地素材', 'AI素材'] as MaterialTab[]).map((tab) => (
+                      <button key={tab} id={tab === 'AI素材' ? 'tour-smart-material-tab' : undefined} onClick={() => setMaterialTab(tab)} className="flex-1 py-3 text-xs font-medium transition-colors" style={{ color: materialTab === tab ? '#0066FF' : 'rgba(148,163,184,0.6)', borderBottom: materialTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: materialTab === tab ? 700 : 500 }}>{tab}</button>
                     ))}
                   </div>
                   {materialTab === '本地素材' ? <LocalMaterialsPanel /> : <SmartGeneratePanel />}
