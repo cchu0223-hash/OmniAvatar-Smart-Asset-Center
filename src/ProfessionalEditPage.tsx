@@ -20,6 +20,20 @@ type VideoRatio = '16:9 宽屏' | '9:16 竖屏' | '4:3' | '1:1 方形'
 type VideoResolution = '720p' | '1080p' | '2K'
 type VideoModel = 'KELING 3.0' | 'KELING 2.1' | 'KELING 1.6'
 
+// 时间轴轨道类型
+type TrackType = 'main' | 'sub'
+type ClipType = 'image' | 'video'
+type TimelineClip = {
+  id: string
+  trackType: TrackType
+  clipType: ClipType
+  startTime: number // 秒
+  duration: number // 秒
+  label: string
+  imageUrl: string
+  prompt: string
+}
+
 const SIDEBAR_TOOLS: { icon: string; label: SidebarTool; aiPlus?: boolean }[] = [
   { icon: 'video_library', label: '我的素材', aiPlus: true },
   { icon: 'account_circle', label: '虚拟人', aiPlus: true },
@@ -101,6 +115,7 @@ const LIP_SYNC_SEGMENT_TRANSLATIONS: Record<string, AsrSegment[]> = {
 // Clip position constants (aligned for V1 ↔ V2 ↔ multimodal tracks)
 const CLIP_LEFT = 40
 const CLIP_WIDTH = 192
+const PX_PER_SEC = 32 // 每秒对应的像素宽度
 
 function ProfessionalEditPage() {
   const navigate = useNavigate()
@@ -132,6 +147,53 @@ function ProfessionalEditPage() {
   // Smart materials state — synced with shared store
   const [smartMaterials, setSmartMaterials] = useState<SmartMaterial[]>(getMaterials)
   const [smartMaterialFilter, setSmartMaterialFilter] = useState<'图片' | '视频'>('图片')
+  const [showCreditsHistory, setShowCreditsHistory] = useState(false)
+
+  // 时间轴轨道数据
+  const [timelineClips, setTimelineClips] = useState<TimelineClip[]>([
+    { id: 'main1', trackType: 'main', clipType: 'video', startTime: 0, duration: 5, label: 'Clip_01.mp4', imageUrl: 'https://picsum.photos/seed/clip01/400/225', prompt: '专业商务场景' },
+    { id: 'main2', trackType: 'main', clipType: 'image', startTime: 5, duration: 3, label: 'photo_001.jpg', imageUrl: 'https://picsum.photos/seed/local01/400/225', prompt: '' },
+    { id: 'sub1', trackType: 'sub', clipType: 'image', startTime: 2, duration: 3, label: 'overlay_01.png', imageUrl: 'https://picsum.photos/seed/sub01/400/225', prompt: '叠加素材' },
+  ])
+
+  // 素材替换核心逻辑
+  const replaceClip = useCallback((clipId: string, newClipType: ClipType) => {
+    setTimelineClips(prev => {
+      const clipIndex = prev.findIndex(c => c.id === clipId)
+      if (clipIndex === -1) return prev
+
+      const clip = prev[clipIndex]
+      const oldDuration = clip.duration
+      const newDuration = newClipType === 'image' ? 3 : 5
+      const timeDiff = newDuration - oldDuration
+
+      if (timeDiff === 0) {
+        // C类：等长替换，仅更新内容
+        return prev.map(c => c.id === clipId ? { ...c, clipType: newClipType, duration: newDuration } : c)
+      }
+
+      const newClips = [...prev]
+      newClips[clipIndex] = { ...clip, clipType: newClipType, duration: newDuration }
+
+      if (clip.trackType === 'main') {
+        // A1/B1：主轨道替换
+        const clipEndTime = clip.startTime + oldDuration
+        newClips.forEach((c, i) => {
+          if (i === clipIndex) return
+          if (c.trackType === 'main' && c.startTime >= clipEndTime) {
+            // 主轨道后续片段
+            c.startTime += timeDiff
+          } else if (c.trackType === 'sub' && c.startTime >= clipEndTime) {
+            // 副轨道区间后
+            c.startTime += timeDiff
+          }
+        })
+      }
+      // A2/B2：副轨道替换，其他轨道不变
+
+      return newClips
+    })
+  }, [])
   const [smartMaterialSearch, setSmartMaterialSearch] = useState('')
 
   const handleDeleteSmartMaterial = (id: string) => {
@@ -180,7 +242,7 @@ function ProfessionalEditPage() {
 
   // ── Context menu ──
   // Anchored to clip's top-right corner: right = distance from viewport right, bottom = distance from clip top
-  const [contextMenu, setContextMenu] = useState<{ right: number; bottom: number } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ right: number; bottom: number; clipId: string } | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const clip01ChipRef = useRef<HTMLDivElement>(null)
 
@@ -236,6 +298,7 @@ function ProfessionalEditPage() {
       setContextMenu({
         right: window.innerWidth - rect.right,
         bottom: window.innerHeight - rect.top + 4,
+        clipId: 'main1',
       })
     }
   }, [clip01Loading])
@@ -386,10 +449,10 @@ function ProfessionalEditPage() {
     e.preventDefault()
     if (clip01ChipRef.current) {
       const rect = clip01ChipRef.current.getBoundingClientRect()
-      // Menu's bottom-right corner anchors to the clip's top-right corner (opens upward)
       setContextMenu({
         right: window.innerWidth - rect.right,
         bottom: window.innerHeight - rect.top + 4,
+        clipId: 'main1',
       })
     }
   }
@@ -771,8 +834,20 @@ function ProfessionalEditPage() {
   // ── Smart Generate Panel (unified 图片/视频) ──
   const SmartGeneratePanel = () => {
     const isImage = generateTab === '图片生成'
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const [showScrollTop, setShowScrollTop] = useState(false)
+
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+      const target = e.currentTarget
+      setShowScrollTop(target.scrollTop > 200)
+    }, [])
+
+    const scrollToTop = () => {
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
     return (
-    <div className="flex-1 overflow-y-auto flex flex-col p-4" style={{ scrollbarWidth: 'none', gap: '14px' }}>
+    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto flex flex-col p-4 relative" style={{ scrollbarWidth: 'none', gap: '14px' }}>
 
       {/* ── Prompt card ── */}
       <div className="relative flex gap-3 p-3" style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', backgroundColor: 'rgba(255,255,255,0.02)', minHeight: '120px' }}>
@@ -907,7 +982,7 @@ function ProfessionalEditPage() {
           <span className="text-[13px] font-bold" style={{ color: 'rgba(203,213,225,0.85)' }}>48,510</span>
         </div>
         <div className="flex items-center gap-2">
-          <div id={isImage ? 'tour-credits' : undefined} className="flex items-center gap-1.5 px-3 py-1.5" style={{ borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div id={isImage ? 'tour-credits' : undefined} onClick={() => setShowCreditsHistory(true)} className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer hover:bg-white/10 transition-colors" style={{ borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#22d3ee' }}>electric_bolt</span>
             <span className="text-[13px] font-bold text-white">{isImage ? 20 : 100}</span>
           </div>
@@ -993,6 +1068,23 @@ function ProfessionalEditPage() {
           ))}
         </div>
       </div>
+
+      {/* 回到顶部按钮 */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="absolute bottom-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg z-50"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,102,255,0.9), rgba(26,127,255,0.9))',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 4px 16px rgba(0,102,255,0.4)'
+          }}
+          aria-label="回到顶部"
+        >
+          <span className="material-symbols-outlined text-white" style={{ fontSize: '20px' }}>arrow_upward</span>
+        </button>
+      )}
     </div>
     )
   }
@@ -1391,6 +1483,54 @@ function ProfessionalEditPage() {
             <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(148,163,184,0.55)' }} aria-hidden="true">layers</span>
             视频多模态拆分
           </button>
+
+          {/* 素材替换 */}
+          {contextMenu.clipId && (() => {
+            const clip = timelineClips.find(c => c.id === contextMenu.clipId)
+            if (!clip) return null
+            const canReplaceWithImage = clip.clipType !== 'image'
+            const canReplaceWithVideo = clip.clipType !== 'video'
+            return (
+              <>
+                <div className="my-1 mx-3" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }}></div>
+                <div className="px-4 py-1.5">
+                  <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'rgba(148,163,184,0.4)' }}>素材替换</span>
+                </div>
+                {canReplaceWithImage && (
+                  <button
+                    onClick={() => { replaceClip(contextMenu.clipId!, 'image'); setContextMenu(null); showToast(`已替换为图片 (3s)，${clip.trackType === 'main' ? '主轨道后续片段已前移' : '其他轨道不受影响'}`) }}
+                    role="menuitem"
+                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                    style={{ color: 'rgba(203,213,225,0.9)' }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <span className="material-symbols-outlined text-base shrink-0" style={{ color: '#60a5fa' }} aria-hidden="true">image</span>
+                    替换为图片 (3s)
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}>
+                      {clip.trackType === 'main' ? `-${clip.duration - 3}s` : '仅本轨'}
+                    </span>
+                  </button>
+                )}
+                {canReplaceWithVideo && (
+                  <button
+                    onClick={() => { replaceClip(contextMenu.clipId!, 'video'); setContextMenu(null); showToast(`已替换为视频 (5s)，${clip.trackType === 'main' ? '主轨道后续片段已延后' : '其他轨道不受影响'}`) }}
+                    role="menuitem"
+                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                    style={{ color: 'rgba(203,213,225,0.9)' }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <span className="material-symbols-outlined text-base shrink-0" style={{ color: '#a78bfa' }} aria-hidden="true">videocam</span>
+                    替换为视频 (5s)
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                      {clip.trackType === 'main' ? `+${5 - clip.duration}s` : '仅本轨'}
+                    </span>
+                  </button>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 
@@ -1757,6 +1897,54 @@ function ProfessionalEditPage() {
                   下载
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 算力消耗历史弹窗 */}
+      {showCreditsHistory && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }} onClick={() => setShowCreditsHistory(false)}>
+          <div className="relative w-[520px] max-h-[600px] rounded-2xl overflow-hidden shadow-2xl border" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }} onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 px-6 py-4 border-b" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">算力消耗历史</h3>
+                <button onClick={() => setShowCreditsHistory(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-white">
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#22d3ee' }}>electric_bolt</span>
+                <span className="text-sm text-slate-400">当前算力: <span className="text-white font-semibold">48,510</span></span>
+              </div>
+            </div>
+            <div className="overflow-y-auto p-6 space-y-3" style={{ maxHeight: '450px' }}>
+              {[
+                { date: '2026-03-27 14:23', type: '图片生成', amount: -20, model: 'JIMENG 4.0', desc: '赛博朋克风格的未来城市' },
+                { date: '2026-03-27 13:45', type: '视频生成', amount: -100, model: 'KELING 3.0', desc: '金色麦田在夕阳下摇曳' },
+                { date: '2026-03-27 11:20', type: '充值', amount: 500, model: '', desc: '算力充值' },
+                { date: '2026-03-26 16:30', type: '图片生成', amount: -20, model: 'JIMENG 3.0', desc: '水墨画风格的山水田园' },
+                { date: '2026-03-26 15:12', type: '视频生成', amount: -100, model: 'KELING 2.1', desc: '樱花树下奔跑的柴犬' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl border hover:bg-white/[0.02] transition-colors" style={{ backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)' }}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.amount > 0 ? 'bg-green-500/10' : 'bg-cyan-500/10'}`}>
+                    <span className={`material-symbols-outlined ${item.amount > 0 ? 'text-green-400' : 'text-cyan-400'}`} style={{ fontSize: '20px', fontVariationSettings: '"FILL" 1' }}>
+                      {item.amount > 0 ? 'add_circle' : 'electric_bolt'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-white font-medium">{item.type}</span>
+                      {item.model && <span className="text-xs text-slate-500 px-2 py-0.5 rounded-full bg-white/5">{item.model}</span>}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">{item.desc}</p>
+                    <p className="text-[10px] text-slate-600 mt-1">{item.date}</p>
+                  </div>
+                  <span className={`text-sm font-semibold ${item.amount > 0 ? 'text-green-400' : 'text-slate-300'}`}>
+                    {item.amount > 0 ? '+' : ''}{item.amount}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

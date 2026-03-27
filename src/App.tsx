@@ -125,6 +125,7 @@ function App() {
   const [showDock, setShowDock] = useState(true)
 
   const [showAnnounceModal, setShowAnnounceModal] = useState(true)
+  const [showCreditsHistory, setShowCreditsHistory] = useState(false)
 
   const controlBarRef = useRef<HTMLDivElement>(null)
   const taskIdCounter = useRef(0)
@@ -420,6 +421,10 @@ function App() {
                 <span className="material-symbols-outlined fill-1" style={{ fontSize: '24px' }}>movie_filter</span>
               </div>
               <h2 className="text-lg font-semibold tracking-wide text-white/90">讯飞智作</h2>
+              <button onClick={() => navigate('/')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>home</span>
+                首页
+              </button>
             </div>
             <div className="h-4 w-px bg-white/10" />
             <button onClick={() => navigate('/professional-edit')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
@@ -433,7 +438,7 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-5">
-            <div id="tour-credits" className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-colors">
+            <div id="tour-credits" onClick={() => setShowCreditsHistory(true)} className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined text-sm mr-2 text-accent-cyan" style={{ fontVariationSettings: '"FILL" 1' }}>bolt</span>
               <span className="text-xs font-semibold text-slate-300 tracking-wide">算力: <span className="text-white">1280</span></span>
             </div>
@@ -1296,6 +1301,54 @@ function App() {
               <div className="p-4 bg-[#0D0E14]/90">
                 <p className="text-sm text-slate-300 line-clamp-2">{imagePreview.prompt}</p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 算力消耗历史弹窗 */}
+      {showCreditsHistory && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }} onClick={() => setShowCreditsHistory(false)}>
+          <div className="relative w-[520px] max-h-[600px] rounded-2xl overflow-hidden shadow-2xl bg-[#0B0C10]/95 backdrop-blur-xl border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 px-6 py-4 border-b border-white/5 bg-[#0B0C10]/80 backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">算力消耗历史</h3>
+                <button onClick={() => setShowCreditsHistory(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-white">
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                <span className="material-symbols-outlined text-accent-cyan" style={{ fontSize: '20px', fontVariationSettings: '"FILL" 1' }}>bolt</span>
+                <span className="text-sm text-slate-400">当前算力: <span className="text-white font-semibold">1280</span></span>
+              </div>
+            </div>
+            <div className="overflow-y-auto p-6 space-y-3" style={{ maxHeight: '450px' }}>
+              {[
+                { date: '2026-03-27 14:23', type: '图片生成', amount: -50, model: 'Flux Pro', desc: '赛博朋克风格的未来城市' },
+                { date: '2026-03-27 13:45', type: '视频生成', amount: -100, model: 'Seedance 2.0', desc: '金色麦田在夕阳下摇曳' },
+                { date: '2026-03-27 11:20', type: '充值', amount: 500, model: '', desc: '算力充值' },
+                { date: '2026-03-26 16:30', type: '图片生成', amount: -50, model: 'DALL-E 3', desc: '水墨画风格的山水田园' },
+                { date: '2026-03-26 15:12', type: '视频生成', amount: -100, model: 'Vidu 2.0', desc: '樱花树下奔跑的柴犬' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.amount > 0 ? 'bg-green-500/10' : 'bg-accent-cyan/10'}`}>
+                    <span className={`material-symbols-outlined ${item.amount > 0 ? 'text-green-400' : 'text-accent-cyan'}`} style={{ fontSize: '20px', fontVariationSettings: '"FILL" 1' }}>
+                      {item.amount > 0 ? 'add_circle' : 'bolt'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-white font-medium">{item.type}</span>
+                      {item.model && <span className="text-xs text-slate-500 px-2 py-0.5 rounded-full bg-white/5">{item.model}</span>}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">{item.desc}</p>
+                    <p className="text-[10px] text-slate-600 mt-1">{item.date}</p>
+                  </div>
+                  <span className={`text-sm font-semibold ${item.amount > 0 ? 'text-green-400' : 'text-slate-300'}`}>
+                    {item.amount > 0 ? '+' : ''}{item.amount}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
