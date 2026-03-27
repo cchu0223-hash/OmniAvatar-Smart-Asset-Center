@@ -3,51 +3,62 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTour } from './useTour'
+import { getMaterials, addMaterial, deleteMaterial, subscribe, type SharedSmartMaterial } from './smartMaterialsStore'
 
-type SidebarTool = '素材' | '虚拟人' | '图片' | '配音' | '文本' | '转场' | '贴纸' | '模板'
+type SidebarTool = '我的素材' | '虚拟人' | '图片' | '配音' | '音乐' | '文本' | '转场' | '模板' | '贴纸' | '素材优化'
+type OptimizeTab = '素材更换' | '素材编辑' | '动画效果'
+type OptimizeReplaceSubTab = '图片生成' | '视频生成'
+type AnimSubTab = '入场动画' | '出场动画'
+type TrackClip = { id: string; label: string; imageUrl: string; prompt: string; ratio: ImageRatio; model: ImageModel; resolution: ImageResolution; isLocal?: boolean }
 type MaterialTab = '本地素材' | '智能素材'
 type GenerateTab = '图片生成' | '视频生成'
 type LocalFilter = '全部' | '视频' | '图片' | '音频'
 type ImageRatio = '16:9 宽屏' | '9:16 竖屏' | '4:3' | '1:1 方形'
-type ImageModel = 'Flux Pro' | 'DALL-E 3' | 'Midjourney V6'
+type ImageModel = 'JIMENG 4.0' | 'JIMENG 3.0' | 'JIMENG 2.1'
 type ImageResolution = '720p' | '1080p' | '2K'
 type VideoRatio = '16:9 宽屏' | '9:16 竖屏' | '4:3' | '1:1 方形'
 type VideoResolution = '720p' | '1080p' | '2K'
-type VideoModel = 'Seedance 2.0' | 'Seedance 2.0 Fast' | 'Veo 3.0' | 'Kling 2.6'
+type VideoModel = 'KELING 3.0' | 'KELING 2.1' | 'KELING 1.6'
 
-const SIDEBAR_TOOLS: { icon: string; label: SidebarTool }[] = [
-  { icon: 'video_library', label: '素材' },
-  { icon: 'person_pin', label: '虚拟人' },
+const SIDEBAR_TOOLS: { icon: string; label: SidebarTool; aiPlus?: boolean }[] = [
+  { icon: 'video_library', label: '我的素材', aiPlus: true },
+  { icon: 'account_circle', label: '虚拟人', aiPlus: true },
   { icon: 'image', label: '图片' },
-  { icon: 'music_note', label: '配音' },
-  { icon: 'title', label: '文本' },
-  { icon: 'animation', label: '转场' },
-  { icon: 'sentiment_satisfied', label: '贴纸' },
-  { icon: 'dashboard_customize', label: '模板' },
+  { icon: 'spatial_audio', label: '配音', aiPlus: true },
+  { icon: 'music_note', label: '音乐' },
+  { icon: 'text_fields', label: '文本' },
+  { icon: 'compare_arrows', label: '转场' },
+  { icon: 'dashboard', label: '模板' },
+  { icon: 'cloud', label: '贴纸' },
 ]
 
+const TRACK_CLIPS: TrackClip[] = [
+  { id: 'clip01', label: 'Clip_01.mp4', imageUrl: 'https://picsum.photos/seed/clip01/400/225', prompt: '专业商务场景，现代办公室背景，明亮自然光', ratio: '16:9 宽屏', model: 'JIMENG 4.0', resolution: '1080p' },
+  { id: 'local01', label: 'photo_001.jpg', imageUrl: 'https://picsum.photos/seed/local01/400/225', prompt: '', ratio: '16:9 宽屏', model: 'JIMENG 4.0', resolution: '1080p', isLocal: true },
+]
 
-const VIDEO_MODELS: VideoModel[] = ['Seedance 2.0', 'Seedance 2.0 Fast', 'Veo 3.0', 'Kling 2.6']
+const RELATED_IMAGES = [
+  { seed: 'rel1', url: 'https://picsum.photos/seed/rel1/300/300' },
+  { seed: 'rel2', url: 'https://picsum.photos/seed/rel2/300/300' },
+  { seed: 'rel3', url: 'https://picsum.photos/seed/rel3/300/300' },
+  { seed: 'rel4', url: 'https://picsum.photos/seed/rel4/300/300' },
+  { seed: 'rel5', url: 'https://picsum.photos/seed/rel5/300/300' },
+  { seed: 'rel6', url: 'https://picsum.photos/seed/rel6/300/300' },
+]
+
+const ENTER_ANIMS = ['淡入', '从左滑入', '从右滑入', '从上滑入', '从下滑入', '缩放进入', '旋转进入', '弹跳进入']
+const EXIT_ANIMS = ['淡出', '向左滑出', '向右滑出', '向上滑出', '向下滑出', '缩放退出', '旋转退出', '弹跳退出']
+
+
+const VIDEO_MODELS: VideoModel[] = ['KELING 3.0', 'KELING 2.1', 'KELING 1.6']
 
 const MODEL_ICONS: Record<VideoModel, string> = {
-  'Seedance 2.0': 'rocket_launch',
-  'Seedance 2.0 Fast': 'bolt',
-  'Veo 3.0': 'movie_filter',
-  'Kling 2.6': 'auto_awesome',
+  'KELING 3.0': 'auto_awesome',
+  'KELING 2.1': 'movie_filter',
+  'KELING 1.6': 'bolt',
 }
 
-// ── Smart material history mock data ──
-type SmartMaterial = { id: number; type: 'image' | 'video'; url: string; prompt: string; ratio?: string; model?: string; duration?: number }
-const SMART_MATERIALS: SmartMaterial[] = [
-  { id: 1, type: 'image', url: 'https://picsum.photos/seed/sm1/400/400', prompt: '赛博朋克城市街景' },
-  { id: 2, type: 'image', url: 'https://picsum.photos/seed/sm2/400/300', prompt: '水墨山水画风格' },
-  { id: 3, type: 'video', url: '', prompt: '产品展示动画', ratio: '16:9 宽屏', model: 'Seedance 2.0', duration: 8 },
-  { id: 4, type: 'image', url: 'https://picsum.photos/seed/sm4/400/400', prompt: '极简商务海报' },
-  { id: 5, type: 'video', url: '', prompt: '品牌宣传片片段', ratio: '9:16 竖屏', model: 'Veo 3.0', duration: 12 },
-  { id: 6, type: 'image', url: 'https://picsum.photos/seed/sm6/400/300', prompt: '自然风景航拍' },
-  { id: 7, type: 'video', url: '', prompt: '科技感UI动效展示', ratio: '16:9 宽屏', model: 'Seedance 2.0 Fast', duration: 6 },
-  { id: 8, type: 'video', url: '', prompt: '美食特写慢镜头', ratio: '4:3', model: 'Kling 2.6', duration: 10 },
-]
+type SmartMaterial = SharedSmartMaterial
 
 const LIP_SYNC_LANGUAGES = ['中文', '英语', '日语', '韩语', '俄语']
 
@@ -95,39 +106,75 @@ function ProfessionalEditPage() {
   const navigate = useNavigate()
 
   // ── Sidebar / panel state ──
-  const [activeTool, setActiveTool] = useState<SidebarTool>('素材')
+  const [activeTool, setActiveTool] = useState<SidebarTool>('我的素材')
   const [materialTab, setMaterialTab] = useState<MaterialTab>('智能素材')
   const [generateTab, setGenerateTab] = useState<GenerateTab>('图片生成')
   const [localFilter, setLocalFilter] = useState<LocalFilter>('全部')
 
   // Image generation
   const [imagePrompt, setImagePrompt] = useState('')
-  const [imageModel, setImageModel] = useState<ImageModel>('Flux Pro')
-  const [imageRatio, setImageRatio] = useState<ImageRatio>('16:9 宽屏')
-  const [imageResolution, setImageResolution] = useState<ImageResolution>('1080p')
+  const [imageModel, setImageModel] = useState<ImageModel>('JIMENG 4.0')
+  const [imageRatio, setImageRatio] = useState<ImageRatio>('1:1 方形')
+  const [imageResolution, setImageResolution] = useState<ImageResolution>('720p')
   const [showAdvancedImage, setShowAdvancedImage] = useState(false)
-  const [imagePopover, setImagePopover] = useState<'ratio' | 'model' | null>(null)
+  const [imagePopover, setImagePopover] = useState<'ratio' | 'model' | 'resolution' | null>(null)
+  const [genPopover, setGenPopover] = useState<'ratio' | 'model' | 'resolution' | 'duration' | null>(null)
 
   // Video generation
   const [videoPrompt, setVideoPrompt] = useState('')
-  const [videoModel, setVideoModel] = useState<VideoModel>('Seedance 2.0 Fast')
+  const [videoModel, setVideoModel] = useState<VideoModel>('KELING 3.0')
   const [videoRatio, setVideoRatio] = useState<VideoRatio>('16:9 宽屏')
-  const [videoResolution, setVideoResolution] = useState<VideoResolution>('1080p')
+  const [videoResolution, setVideoResolution] = useState<VideoResolution>('720p')
   const [showAdvancedVideo, setShowAdvancedVideo] = useState(false)
-  const [videoPopover, setVideoPopover] = useState<'ratio' | 'model' | null>(null)
+  const [videoPopover, setVideoPopover] = useState<'ratio' | 'model' | 'resolution' | null>(null)
   const [videoDuration, setVideoDuration] = useState(5)
 
-  // Smart materials state
-  const [smartMaterials, setSmartMaterials] = useState<SmartMaterial[]>(SMART_MATERIALS)
+  // Smart materials state — synced with shared store
+  const [smartMaterials, setSmartMaterials] = useState<SmartMaterial[]>(getMaterials)
+  const [smartMaterialFilter, setSmartMaterialFilter] = useState<'图片' | '视频'>('图片')
+  const [smartMaterialSearch, setSmartMaterialSearch] = useState('')
 
-  const handleDeleteSmartMaterial = (id: number) => {
-    setSmartMaterials(prev => prev.filter(m => m.id !== id))
+  const handleDeleteSmartMaterial = (id: string) => {
+    deleteMaterial(id)
   }
+
+  // Subscribe to shared store changes
+  useEffect(() => {
+    return subscribe(setSmartMaterials)
+  }, [])
 
   // Lightbox for smart material preview
   const [lightboxItem, setLightboxItem] = useState<SmartMaterial | null>(null)
 
   const [aiLabel, setAiLabel] = useState(false)
+
+  // ── Track selection / Material Optimize ──
+  const [selectedTrack, setSelectedTrack] = useState<TrackClip | null>(null)
+  const [optimizeTab, setOptimizeTab] = useState<OptimizeTab>('素材更换')
+  const [replaceSubTab, setReplaceSubTab] = useState<OptimizeReplaceSubTab>('图片生成')
+  const [animSubTab, setAnimSubTab] = useState<AnimSubTab>('入场动画')
+  const [editX, setEditX] = useState(0)
+  const [editY, setEditY] = useState(0)
+  const [editW, setEditW] = useState(100)
+  const [editH, setEditH] = useState(100)
+  const [selectedEnterAnim, setSelectedEnterAnim] = useState('淡入')
+  const [selectedExitAnim, setSelectedExitAnim] = useState('淡出')
+  const [selectedRelated, setSelectedRelated] = useState<string | null>(null)
+
+  // Optimize panel editable params (initialized from selected track)
+  const [optimizePrompt, setOptimizePrompt] = useState('')
+  const [optimizeModel, setOptimizeModel] = useState<ImageModel>('JIMENG 4.0')
+  const [optimizeRatio, setOptimizeRatio] = useState<ImageRatio>('16:9 宽屏')
+  const [optimizeResolution, setOptimizeResolution] = useState<ImageResolution>('720p')
+  const [optimizePopover, setOptimizePopover] = useState<'ratio' | 'model' | 'resolution' | null>(null)
+  const [optimizeGenPopover, setOptimizeGenPopover] = useState<'ratio' | 'model' | 'resolution' | 'duration' | null>(null)
+  const [optimizeDuration, setOptimizeDuration] = useState(5)
+  const [optimizeMaterialFilter, setOptimizeMaterialFilter] = useState<'图片' | '视频'>('图片')
+  const [optimizeMaterialSearch, setOptimizeMaterialSearch] = useState('')
+
+  // ── Panel resize ──
+  const [leftPanelWidth, setLeftPanelWidth] = useState(288)
+  const [timelineHeight, setTimelineHeight] = useState(256)
 
 
 
@@ -163,6 +210,25 @@ function ProfessionalEditPage() {
     setTimeout(() => setToast(null), 3000)
   }, [])
 
+  // ── Resize handlers ──
+  const handleLeftResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX, startW = leftPanelWidth
+    const onMove = (ev: MouseEvent) => setLeftPanelWidth(Math.max(220, Math.min(480, startW + ev.clientX - startX)))
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [leftPanelWidth])
+
+  const handleTimelineResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startY = e.clientY, startH = timelineHeight
+    const onMove = (ev: MouseEvent) => setTimelineHeight(Math.max(120, Math.min(420, startH + startY - ev.clientY)))
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [timelineHeight])
+
   // ── Tour: open context-menu programmatically (used by tour next-override) ──
   const openContextMenuForTour = useCallback(() => {
     if (clip01ChipRef.current && !clip01Loading) {
@@ -173,6 +239,18 @@ function ProfessionalEditPage() {
       })
     }
   }, [clip01Loading])
+  // Init optimize panel params when track selection changes
+  useEffect(() => {
+    if (selectedTrack) {
+      setOptimizePrompt(selectedTrack.prompt)
+      setOptimizeModel(selectedTrack.model)
+      setOptimizeRatio(selectedTrack.ratio)
+      setOptimizeResolution(selectedTrack.resolution)
+      setOptimizePopover(null)
+      setSelectedRelated(null)
+    }
+  }, [selectedTrack])
+
   // Stable ref so tour closure always calls the latest version
   const openContextMenuRef = useRef(openContextMenuForTour)
   useEffect(() => { openContextMenuRef.current = openContextMenuForTour }, [openContextMenuForTour])
@@ -253,6 +331,30 @@ function ProfessionalEditPage() {
     const timer = setTimeout(() => document.addEventListener('click', handler), 0)
     return () => { clearTimeout(timer); document.removeEventListener('click', handler) }
   }, [imagePopover, videoPopover])
+
+  // Close optimize popover on outside click
+  useEffect(() => {
+    if (!optimizePopover) return
+    const handler = () => setOptimizePopover(null)
+    const timer = setTimeout(() => document.addEventListener('click', handler), 0)
+    return () => { clearTimeout(timer); document.removeEventListener('click', handler) }
+  }, [optimizePopover])
+
+  // Close genPopover on outside click
+  useEffect(() => {
+    if (!genPopover) return
+    const handler = () => setGenPopover(null)
+    const timer = setTimeout(() => document.addEventListener('click', handler), 0)
+    return () => { clearTimeout(timer); document.removeEventListener('click', handler) }
+  }, [genPopover])
+
+  // Close optimizeGenPopover on outside click
+  useEffect(() => {
+    if (!optimizeGenPopover) return
+    const handler = () => setOptimizeGenPopover(null)
+    const timer = setTimeout(() => document.addEventListener('click', handler), 0)
+    return () => { clearTimeout(timer); document.removeEventListener('click', handler) }
+  }, [optimizeGenPopover])
 
   // Close context menu on outside click
   useEffect(() => {
@@ -345,6 +447,278 @@ function ProfessionalEditPage() {
     }, 5000)
   }
 
+  // ── Material Optimize Panel (shown when track is selected) ──
+  const MaterialOptimizePanel = () => (
+    <div className="flex-1 overflow-hidden flex flex-col">
+      {/* 3 tabs */}
+      <div className="flex shrink-0" style={{ borderBottom: '1px solid #222226' }}>
+        {(['素材更换', '素材编辑', '动画效果'] as OptimizeTab[]).map(tab => (
+          <button key={tab} onClick={() => setOptimizeTab(tab)} className="flex-1 py-2.5 text-[11px] font-medium transition-colors" style={{ color: optimizeTab === tab ? '#0066FF' : 'rgba(148,163,184,0.5)', borderBottom: optimizeTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: optimizeTab === tab ? 700 : 500 }}>{tab}</button>
+        ))}
+      </div>
+
+      {/* ── 素材更换 ── */}
+      {optimizeTab === '素材更换' && (() => {
+        const isImg = replaceSubTab === '图片生成'
+        return (
+        <div className="flex-1 overflow-y-auto flex flex-col p-4" style={{ scrollbarWidth: 'none', gap: '14px' }}>
+
+          {/* Prompt card: ref image + textarea + 示例 */}
+          <div className="relative flex gap-3 p-3" style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', backgroundColor: 'rgba(255,255,255,0.02)', minHeight: '120px' }}>
+            {selectedTrack?.isLocal ? (
+              <button className="shrink-0 flex flex-col items-center justify-center gap-1.5" style={{ width: '80px', height: '96px', borderRadius: '10px', border: '1px dashed rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'rgba(148,163,184,0.4)' }} aria-label="上传参考图">
+                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add_photo_alternate</span>
+                <span className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(148,163,184,0.3)' }}>REFERENCE</span>
+              </button>
+            ) : (
+              <div className="relative shrink-0 group cursor-pointer" style={{ width: '80px', height: '96px', borderRadius: '10px', overflow: 'hidden', border: '1px dashed rgba(255,255,255,0.15)' }}>
+                <img src={selectedTrack?.imageUrl ?? 'https://picsum.photos/seed/refmock/300/300'} alt="参考图" className="w-full h-full object-cover opacity-80" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: '18px' }}>add_photo_alternate</span>
+                  <span className="text-[8px] text-white/80">更换</span>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 py-0.5 text-center" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                  <span className="text-[8px] text-white/70">参考图</span>
+                </div>
+              </div>
+            )}
+            <textarea
+              value={optimizePrompt}
+              onChange={(e) => { setOptimizePrompt(e.target.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px' }}
+              className="flex-1 text-[12px] resize-none outline-none leading-relaxed bg-transparent"
+              style={{ color: 'rgba(203,213,225,0.9)', minHeight: '96px', paddingTop: '4px' }}
+              placeholder="请描述要生成的画面内容…"
+              aria-label="画面描述"
+            />
+          </div>
+
+          {/* Controls row: type toggle + ratio + model + resolution [+ duration for video] */}
+          <div className="flex items-center gap-1.5">
+            {/* Type toggle */}
+            <div className="flex shrink-0 p-0.5 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+              {(['图片生成', '视频生成'] as OptimizeReplaceSubTab[]).map(t => (
+                <button key={t} onClick={() => { setReplaceSubTab(t); setOptimizeGenPopover(null) }}
+                  className="px-2 py-1 text-[9px] font-medium rounded transition-all"
+                  style={{ color: replaceSubTab === t ? 'white' : 'rgba(148,163,184,0.5)', backgroundColor: replaceSubTab === t ? '#0066FF' : 'transparent', fontWeight: replaceSubTab === t ? 700 : 500 }}>
+                  {t === '图片生成' ? '图片' : '视频'}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-3 shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            {/* 比例 */}
+            <div className="relative flex-1">
+              <button onClick={() => setOptimizeGenPopover(optimizeGenPopover === 'ratio' ? null : 'ratio')} className="w-full flex items-center gap-1 px-2 py-1.5 transition-all" style={{ borderRadius: '8px', backgroundColor: optimizeGenPopover === 'ratio' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${optimizeGenPopover === 'ratio' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}>
+                <span className="text-[9px] font-medium flex-1 text-left truncate">{optimizeRatio.replace(' 宽屏','').replace(' 竖屏','').replace(' 方形','')}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
+              </button>
+              {optimizeGenPopover === 'ratio' && (
+                <div className="absolute top-full left-0 mt-1 w-28 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                  {(['16:9 宽屏','9:16 竖屏','4:3','1:1 方形'] as ImageRatio[]).map(r => (
+                    <button key={r} onClick={() => { setOptimizeRatio(r); setOptimizeGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-white/5 transition-colors" style={{ color: optimizeRatio === r ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: optimizeRatio === r ? 600 : 400 }}>{r}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* 模型 */}
+            <div className="relative flex-1">
+              <button onClick={() => setOptimizeGenPopover(optimizeGenPopover === 'model' ? null : 'model')} className="w-full flex items-center gap-1 px-2 py-1.5 transition-all" style={{ borderRadius: '8px', backgroundColor: optimizeGenPopover === 'model' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${optimizeGenPopover === 'model' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}>
+                <span className="text-[9px] font-medium flex-1 text-left truncate">{isImg ? optimizeModel : videoModel}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
+              </button>
+              {optimizeGenPopover === 'model' && (
+                <div className="absolute top-full left-0 mt-1 w-36 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                  {(isImg ? ['JIMENG 4.0','JIMENG 3.0','JIMENG 2.1'] as ImageModel[] : VIDEO_MODELS).map(m => (
+                    <button key={m} onClick={() => { isImg ? setOptimizeModel(m as ImageModel) : setVideoModel(m as VideoModel); setOptimizeGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-white/5 transition-colors" style={{ color: (isImg ? optimizeModel : videoModel) === m ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: (isImg ? optimizeModel : videoModel) === m ? 600 : 400 }}>{m}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* 分辨率 */}
+            <div className="relative flex-1">
+              <button onClick={() => setOptimizeGenPopover(optimizeGenPopover === 'resolution' ? null : 'resolution')} className="w-full flex items-center gap-1 px-2 py-1.5 transition-all" style={{ borderRadius: '8px', backgroundColor: optimizeGenPopover === 'resolution' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${optimizeGenPopover === 'resolution' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}>
+                <span className="text-[9px] font-medium flex-1 text-left truncate">{isImg ? optimizeResolution : videoResolution}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
+              </button>
+              {optimizeGenPopover === 'resolution' && (
+                <div className="absolute top-full right-0 mt-1 w-20 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                  {(['720p','1080p','2K'] as ImageResolution[]).map(r => (
+                    <button key={r} onClick={() => { isImg ? setOptimizeResolution(r) : setVideoResolution(r as VideoResolution); setOptimizeGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-white/5 transition-colors" style={{ color: (isImg ? optimizeResolution : videoResolution) === r ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: (isImg ? optimizeResolution : videoResolution) === r ? 600 : 400 }}>{r}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* 时长 (video only) */}
+            {!isImg && (
+              <div className="relative flex-1">
+                <button onClick={() => setOptimizeGenPopover(optimizeGenPopover === 'duration' ? null : 'duration')} className="w-full flex items-center gap-1 px-2 py-1.5 transition-all" style={{ borderRadius: '8px', backgroundColor: optimizeGenPopover === 'duration' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${optimizeGenPopover === 'duration' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}>
+                  <span className="text-[9px] font-medium flex-1 text-left truncate">{optimizeDuration}s</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
+                </button>
+                {optimizeGenPopover === 'duration' && (
+                  <div className="absolute top-full right-0 mt-1 w-20 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                    {[4, 5, 6, 8, 10, 12, 15].map(d => (
+                      <button key={d} onClick={() => { setOptimizeDuration(d); setOptimizeGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-white/5 transition-colors" style={{ color: optimizeDuration === d ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: optimizeDuration === d ? 600 : 400 }}>{d}s</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* CTA row */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.35)' }}>剩余算力</span>
+              <span className="text-[13px] font-bold" style={{ color: 'rgba(203,213,225,0.85)' }}>48,510</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-3 py-1.5" style={{ borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#22d3ee' }}>electric_bolt</span>
+                <span className="text-[13px] font-bold text-white">{isImg ? 20 : 100}</span>
+              </div>
+              <button className="px-4 py-2 text-white text-[12px] font-bold flex items-center gap-1.5 hover:brightness-110 transition-all" style={{ borderRadius: '8px', background: 'linear-gradient(135deg, #0066FF 0%, #1a7fff 100%)', boxShadow: '0 4px 16px rgba(0,102,255,0.3)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{isImg ? 'image' : 'videocam'}</span>
+                重新生成
+              </button>
+            </div>
+          </div>
+
+          {/* 我的智能素材 */}
+          <div className="flex flex-col" style={{ gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">search</span>
+              <input
+                type="text"
+                value={optimizeMaterialSearch}
+                onChange={e => setOptimizeMaterialSearch(e.target.value)}
+                placeholder="搜索素材…"
+                className="w-full rounded-lg text-xs py-2 pl-8 pr-3 outline-none transition-all"
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid #222226', color: 'rgba(203,213,225,0.9)' }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#0066FF' }}
+                onBlur={e => { e.currentTarget.style.borderColor = '#222226' }}
+                aria-label="搜索智能素材"
+              />
+            </div>
+            <div className="flex gap-1">
+              {(['图片', '视频'] as const).map(f => (
+                <button key={f} onClick={() => setOptimizeMaterialFilter(f)} className="px-2 py-0.5 text-[9px] font-medium rounded transition-all" style={{ backgroundColor: optimizeMaterialFilter === f ? '#0066FF' : 'rgba(255,255,255,0.05)', color: optimizeMaterialFilter === f ? 'white' : 'rgba(148,163,184,0.5)', border: `1px solid ${optimizeMaterialFilter === f ? '#0066FF' : 'rgba(255,255,255,0.06)'}` }}>{f}</button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {/* Current track — highlighted, shown when filter is 图片 */}
+              {selectedTrack && optimizeMaterialFilter === '图片' && (() => {
+                const isSel = selectedRelated === '__current__'
+                return (
+                  <div className="relative aspect-square overflow-hidden cursor-pointer group" style={{ borderRadius: '6px', border: `2px solid ${isSel ? '#0066FF' : 'rgba(0,102,255,0.5)'}`, boxShadow: isSel ? '0 0 0 2px rgba(0,102,255,0.3)' : 'none' }} onClick={() => setSelectedRelated('__current__')}>
+                    <img src={selectedTrack.imageUrl} alt="当前素材" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-0.5 right-0.5 px-1 py-px" style={{ backgroundColor: '#0066FF', borderRadius: '3px' }}>
+                      <span className="text-[7px] text-white font-bold">当前</span>
+                    </div>
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-0.5">
+                      <div className="flex justify-end">
+                        <button onClick={(e) => { e.stopPropagation(); setLightboxItem({ id: '__current__', type: 'image', url: selectedTrack.imageUrl, prompt: selectedTrack.prompt }) }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="放大"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>zoom_in</span></button>
+                      </div>
+                      <div className="flex justify-end gap-0.5">
+                        <button onClick={(e) => { e.stopPropagation(); showToast('已加入轨道') }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="加入"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>add_circle</span></button>
+                        <button onClick={(e) => { e.stopPropagation(); showToast('已开始下载') }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="下载"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>download</span></button>
+                        <button onClick={(e) => { e.stopPropagation(); showToast('已删除') }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="删除"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>delete</span></button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              {smartMaterials
+                .filter(m => m.type === (optimizeMaterialFilter === '图片' ? 'image' : 'video'))
+                .filter(m => !optimizeMaterialSearch || m.prompt.toLowerCase().includes(optimizeMaterialSearch.toLowerCase()))
+                .map(item => {
+                  const isSel = selectedRelated === String(item.id)
+                  return (
+                    <div key={item.id} className="relative overflow-hidden cursor-pointer group" style={{ borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.04)', aspectRatio: item.type === 'video' ? '16/9' : '1/1', border: `2px solid ${isSel ? '#0066FF' : 'transparent'}`, boxShadow: isSel ? '0 0 0 2px rgba(0,102,255,0.3)' : 'none' }} onClick={() => setSelectedRelated(String(item.id))}>
+                      {item.type === 'image' ? (
+                        <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,102,255,0.08), rgba(112,0,255,0.08))' }}>
+                          <span className="material-symbols-outlined text-xl" style={{ color: 'rgba(148,163,184,0.2)' }}>movie</span>
+                        </div>
+                      )}
+                      <div className="absolute bottom-0.5 right-0.5 px-1 py-px" style={{ backgroundColor: item.type === 'video' ? 'rgba(112,0,255,0.6)' : 'rgba(0,0,0,0.55)', borderRadius: '3px' }}>
+                        <span className="text-[8px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{item.type === 'video' ? '视频' : 'AI生成'}</span>
+                      </div>
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-0.5">
+                        <div className="flex justify-end">
+                          <button onClick={(e) => { e.stopPropagation(); setLightboxItem(item) }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="放大"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>zoom_in</span></button>
+                        </div>
+                        <div className="flex justify-end gap-0.5">
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedRelated(String(item.id)); showToast('已加入轨道') }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="加入"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>add_circle</span></button>
+                          <button onClick={(e) => { e.stopPropagation(); showToast('已开始下载') }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="下载"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>download</span></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteSmartMaterial(item.id) }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="删除"><span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>delete</span></button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* ── 素材编辑 ── */}
+      {optimizeTab === '素材编辑' && (
+        <div className="flex-1 overflow-y-auto flex flex-col p-4" style={{ scrollbarWidth: 'none', gap: '20px' }}>
+          <div className="flex flex-col" style={{ gap: '12px' }}>
+            <span className="text-[11px] font-semibold" style={{ color: 'rgba(203,213,225,0.7)' }}>位置</span>
+            {[['X 轴', editX, setEditX], ['Y 轴', editY, setEditY]].map(([label, val, setter]) => (
+              <div key={label as string} className="flex flex-col" style={{ gap: '6px' }}>
+                <div className="flex justify-between">
+                  <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{label as string}</span>
+                  <span className="text-[10px] font-mono" style={{ color: '#0066FF' }}>{val as number}</span>
+                </div>
+                <input type="range" min={-200} max={200} value={val as number} onChange={(e) => (setter as (v: number) => void)(Number(e.target.value))} className="w-full h-1 appearance-none cursor-pointer outline-none" style={{ background: `linear-gradient(to right, #0066FF ${((val as number + 200) / 400) * 100}%, rgba(255,255,255,0.08) ${((val as number + 200) / 400) * 100}%)`, borderRadius: '4px', WebkitAppearance: 'none' }} />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col" style={{ gap: '12px' }}>
+            <span className="text-[11px] font-semibold" style={{ color: 'rgba(203,213,225,0.7)' }}>大小</span>
+            {[['宽度 %', editW, setEditW], ['高度 %', editH, setEditH]].map(([label, val, setter]) => (
+              <div key={label as string} className="flex flex-col" style={{ gap: '6px' }}>
+                <div className="flex justify-between">
+                  <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{label as string}</span>
+                  <span className="text-[10px] font-mono" style={{ color: '#0066FF' }}>{val as number}%</span>
+                </div>
+                <input type="range" min={10} max={200} value={val as number} onChange={(e) => (setter as (v: number) => void)(Number(e.target.value))} className="w-full h-1 appearance-none cursor-pointer outline-none" style={{ background: `linear-gradient(to right, #0066FF ${((val as number - 10) / 190) * 100}%, rgba(255,255,255,0.08) ${((val as number - 10) / 190) * 100}%)`, borderRadius: '4px', WebkitAppearance: 'none' }} />
+              </div>
+            ))}
+            <button onClick={() => { setEditX(0); setEditY(0); setEditW(100); setEditH(100) }} className="text-[10px] self-start hover:text-white transition-colors" style={{ color: 'rgba(148,163,184,0.4)' }}>重置</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 动画效果 ── */}
+      {optimizeTab === '动画效果' && (
+        <div className="flex-1 overflow-y-auto flex flex-col p-3" style={{ scrollbarWidth: 'none', gap: '12px' }}>
+          <div className="flex p-0.5 rounded-lg shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+            {(['入场动画', '出场动画'] as AnimSubTab[]).map(tab => (
+              <button key={tab} onClick={() => setAnimSubTab(tab)} className="flex-1 py-1.5 text-[11px] font-medium rounded transition-all" style={{ color: animSubTab === tab ? 'white' : 'rgba(148,163,184,0.5)', backgroundColor: animSubTab === tab ? '#0066FF' : 'transparent' }}>{tab}</button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {(animSubTab === '入场动画' ? ENTER_ANIMS : EXIT_ANIMS).map(anim => {
+              const isSel = animSubTab === '入场动画' ? selectedEnterAnim === anim : selectedExitAnim === anim
+              return (
+                <button key={anim} onClick={() => animSubTab === '入场动画' ? setSelectedEnterAnim(anim) : setSelectedExitAnim(anim)} className="py-2.5 text-[11px] font-medium transition-all rounded-lg" style={{ backgroundColor: isSel ? 'rgba(0,102,255,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isSel ? 'rgba(0,102,255,0.5)' : 'rgba(255,255,255,0.07)'}`, color: isSel ? '#60a5fa' : 'rgba(148,163,184,0.65)' }}>{anim}</button>
+              )
+            })}
+          </div>
+          <div className="flex flex-col" style={{ gap: '6px', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="flex justify-between text-[10px]"><span style={{ color: 'rgba(148,163,184,0.4)' }}>入场：</span><span style={{ color: '#60a5fa' }}>{selectedEnterAnim}</span></div>
+            <div className="flex justify-between text-[10px]"><span style={{ color: 'rgba(148,163,184,0.4)' }}>出场：</span><span style={{ color: '#60a5fa' }}>{selectedExitAnim}</span></div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
   // ── Local Materials Panel ──
   const LocalMaterialsPanel = () => (
     <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-4" style={{ scrollbarWidth: 'none' }}>
@@ -394,333 +768,234 @@ function ProfessionalEditPage() {
     </div>
   )
 
-  // ── Image Generation Panel ──
-  const ImageGeneratePanel = () => (
-    <div className="flex-1 overflow-y-auto flex flex-col p-5" style={{ scrollbarWidth: 'none', gap: '20px' }}>
-      {/* ── Prompt Input (full-width, auto-resize) ── */}
-      <div className="flex flex-col" style={{ gap: '12px' }}>
+  // ── Smart Generate Panel (unified 图片/视频) ──
+  const SmartGeneratePanel = () => {
+    const isImage = generateTab === '图片生成'
+    return (
+    <div className="flex-1 overflow-y-auto flex flex-col p-4" style={{ scrollbarWidth: 'none', gap: '14px' }}>
+
+      {/* ── Prompt card ── */}
+      <div className="relative flex gap-3 p-3" style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', backgroundColor: 'rgba(255,255,255,0.02)', minHeight: '120px' }}>
+        <button
+          className="shrink-0 flex flex-col items-center justify-center gap-1.5"
+          style={{ width: '80px', height: '96px', borderRadius: '10px', border: '1px dashed rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'rgba(148,163,184,0.4)' }}
+          aria-label="上传参考图"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add_photo_alternate</span>
+          <span className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(148,163,184,0.3)' }}>REFERENCE</span>
+        </button>
         <textarea
-          value={imagePrompt}
-          onChange={(e) => { setImagePrompt(e.target.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px' }}
-          className="w-full text-[13px] p-3 resize-none outline-none transition-all leading-relaxed"
-          style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'rgba(203,213,225,0.9)', minHeight: '80px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-          placeholder="描述你想要生成的画面…"
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,102,255,0.5)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,102,255,0.1)' }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)' }}
+          value={isImage ? imagePrompt : videoPrompt}
+          onChange={(e) => {
+            if (isImage) setImagePrompt(e.target.value)
+            else setVideoPrompt(e.target.value)
+            e.currentTarget.style.height = 'auto'
+            e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'
+          }}
+          className="flex-1 text-[12px] resize-none outline-none leading-relaxed bg-transparent"
+          style={{ color: 'rgba(203,213,225,0.9)', minHeight: '96px', paddingTop: '4px' }}
+          placeholder={isImage ? '描述你想生成的图片内容，例如：一只穿着宇航服的猫咪漫步在月球表面...' : '支持上传多个参考素材，输入文字例如：@图片1 走进一个繁华的商业街，背景灯光闪烁...'}
           aria-label="画面描述"
         />
-        {/* Reference image (below prompt, inline) */}
-        <button className="w-full h-16 flex items-center justify-center gap-2 transition-all" style={{ border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(148,163,184,0.4)' }} aria-label="上传参考图">
-          <span className="material-symbols-outlined text-lg" aria-hidden="true">add_photo_alternate</span>
-          <span className="text-[11px]">添加参考图</span>
-        </button>
       </div>
 
-      {/* ── Ratio + Model: 2-col icon pill selectors ── */}
-      <div className="grid grid-cols-2" style={{ gap: '12px' }}>
+      {/* ── Controls row: type toggle + type-specific dropdowns ── */}
+      <div className="flex items-center gap-1.5">
+        {/* Type toggle pill */}
+        <div className="flex shrink-0 p-0.5 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+          {(['图片生成', '视频生成'] as GenerateTab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => { setGenerateTab(t); setGenPopover(null) }}
+              className="px-2 py-1 text-[9px] font-medium rounded transition-all"
+              style={{ color: generateTab === t ? 'white' : 'rgba(148,163,184,0.5)', backgroundColor: generateTab === t ? '#0066FF' : 'transparent', fontWeight: generateTab === t ? 700 : 500 }}
+            >
+              {t === '图片生成' ? '图片' : '视频'}
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-3 shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }} />
+
         {/* 比例 */}
-        <div className="relative flex flex-col" style={{ gap: '6px' }}>
-          <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>比例</span>
+        <div className="relative flex-1">
           <button
-            onClick={() => setImagePopover(imagePopover === 'ratio' ? null : 'ratio')}
-            className="flex items-center gap-2 px-3 py-2 transition-all"
-            style={{ borderRadius: '12px', backgroundColor: imagePopover === 'ratio' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${imagePopover === 'ratio' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+            onClick={() => setGenPopover(genPopover === 'ratio' ? null : 'ratio')}
+            className="w-full flex items-center gap-1 px-2 py-1.5 transition-all"
+            style={{ borderRadius: '8px', backgroundColor: genPopover === 'ratio' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${genPopover === 'ratio' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}
           >
-            <span className="material-symbols-outlined text-sm" style={{ color: '#0066FF' }} aria-hidden="true">aspect_ratio</span>
-            <span className="text-[11px] font-medium flex-1 text-left truncate">{imageRatio.replace(' 宽屏', '').replace(' 竖屏', '').replace(' 方形', '')}</span>
-            <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">unfold_more</span>
+            <span className="text-[9px] font-medium flex-1 text-left truncate">
+              {(isImage ? imageRatio : videoRatio).replace(' 宽屏', '').replace(' 竖屏', '').replace(' 方形', '')}
+            </span>
+            <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
           </button>
-          {imagePopover === 'ratio' && (
-            <div className="absolute bottom-full left-0 mb-2 w-full overflow-hidden z-50" style={{ borderRadius: '12px', backgroundColor: 'rgba(22,23,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', animation: 'popup-up 0.2s ease-out' }}>
-              {(['16:9 宽屏', '9:16 竖屏', '4:3', '1:1 方形'] as ImageRatio[]).map((r) => (
-                <button key={r} onClick={() => { setImageRatio(r); setImagePopover(null) }} className="w-full px-3 py-2 text-left text-[11px] transition-colors hover:bg-white/5 flex items-center gap-2" style={{ color: imageRatio === r ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: imageRatio === r ? 600 : 400 }}>
-                  {imageRatio === r ? <span className="material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span> : <span className="w-4" />}
-                  {r}
-                </button>
+          {genPopover === 'ratio' && (
+            <div className="absolute top-full left-0 mt-1 w-28 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              {(['16:9 宽屏', '9:16 竖屏', '4:3', '1:1 方形'] as ImageRatio[]).map(r => (
+                <button key={r} onClick={() => { isImage ? setImageRatio(r) : setVideoRatio(r as VideoRatio); setGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-white/5" style={{ color: (isImage ? imageRatio : videoRatio) === r ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: (isImage ? imageRatio : videoRatio) === r ? 600 : 400 }}>{r}</button>
               ))}
             </div>
           )}
         </div>
+
         {/* 模型 */}
-        <div className="relative flex flex-col" style={{ gap: '6px' }}>
-          <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>模型</span>
+        <div className="relative flex-1">
           <button
-            onClick={() => setImagePopover(imagePopover === 'model' ? null : 'model')}
-            className="flex items-center gap-2 px-3 py-2 transition-all"
-            style={{ borderRadius: '12px', backgroundColor: imagePopover === 'model' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${imagePopover === 'model' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+            onClick={() => setGenPopover(genPopover === 'model' ? null : 'model')}
+            className="w-full flex items-center gap-1 px-2 py-1.5 transition-all"
+            style={{ borderRadius: '8px', backgroundColor: genPopover === 'model' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${genPopover === 'model' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}
           >
-            <span className="material-symbols-outlined text-sm" style={{ color: '#0066FF' }} aria-hidden="true">auto_awesome</span>
-            <span className="text-[11px] font-medium flex-1 text-left truncate">{imageModel}</span>
-            <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">unfold_more</span>
+            <span className="text-[9px] font-medium flex-1 text-left truncate">{isImage ? imageModel : videoModel}</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
           </button>
-          {imagePopover === 'model' && (
-            <div className="absolute bottom-full left-0 mb-2 w-full overflow-hidden z-50" style={{ borderRadius: '12px', backgroundColor: 'rgba(22,23,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', animation: 'popup-up 0.2s ease-out' }}>
-              {(['Flux Pro', 'DALL-E 3', 'Midjourney V6'] as ImageModel[]).map((m) => (
-                <button key={m} onClick={() => { setImageModel(m); setImagePopover(null) }} className="w-full px-3 py-2 text-left text-[11px] transition-colors hover:bg-white/5 flex items-center gap-2" style={{ color: imageModel === m ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: imageModel === m ? 600 : 400 }}>
-                  {imageModel === m ? <span className="material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span> : <span className="w-4" />}
-                  {m}
-                </button>
+          {genPopover === 'model' && (
+            <div className="absolute top-full left-0 mt-1 w-36 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              {(isImage ? ['JIMENG 4.0', 'JIMENG 3.0', 'JIMENG 2.1'] as ImageModel[] : VIDEO_MODELS).map(m => (
+                <button key={m} onClick={() => { isImage ? setImageModel(m as ImageModel) : setVideoModel(m as VideoModel); setGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-white/5" style={{ color: (isImage ? imageModel : videoModel) === m ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: (isImage ? imageModel : videoModel) === m ? 600 : 400 }}>{m}</button>
               ))}
             </div>
           )}
         </div>
+
+        {/* 分辨率 */}
+        <div className="relative flex-1">
+          <button
+            onClick={() => setGenPopover(genPopover === 'resolution' ? null : 'resolution')}
+            className="w-full flex items-center gap-1 px-2 py-1.5 transition-all"
+            style={{ borderRadius: '8px', backgroundColor: genPopover === 'resolution' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${genPopover === 'resolution' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}
+          >
+            <span className="text-[9px] font-medium flex-1 text-left truncate">{isImage ? imageResolution : videoResolution}</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
+          </button>
+          {genPopover === 'resolution' && (
+            <div className="absolute top-full right-0 mt-1 w-20 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              {(['720p', '1080p', '2K'] as ImageResolution[]).map(r => (
+                <button key={r} onClick={() => { isImage ? setImageResolution(r) : setVideoResolution(r as VideoResolution); setGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-white/5" style={{ color: (isImage ? imageResolution : videoResolution) === r ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: (isImage ? imageResolution : videoResolution) === r ? 600 : 400 }}>{r}</button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 时长 (video only) */}
+        {!isImage && (
+          <div className="relative flex-1">
+            <button
+              onClick={() => setGenPopover(genPopover === 'duration' ? null : 'duration')}
+              className="w-full flex items-center gap-1 px-2 py-1.5 transition-all"
+              style={{ borderRadius: '8px', backgroundColor: genPopover === 'duration' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${genPopover === 'duration' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)' }}
+            >
+              <span className="text-[9px] font-medium flex-1 text-left truncate">{videoDuration}s</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '10px', color: 'rgba(148,163,184,0.4)' }}>unfold_more</span>
+            </button>
+            {genPopover === 'duration' && (
+              <div className="absolute top-full right-0 mt-1 w-20 overflow-hidden z-50" style={{ borderRadius: '8px', backgroundColor: 'rgba(22,23,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                {[4, 5, 6, 8, 10, 12, 15].map(d => (
+                  <button key={d} onClick={() => { setVideoDuration(d); setGenPopover(null) }} className="w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-white/5" style={{ color: videoDuration === d ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: videoDuration === d ? 600 : 400 }}>{d}s</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
-      {/* ── Advanced Settings (collapsible) ── */}
-      <button
-        onClick={() => setShowAdvancedImage(v => !v)}
-        className="flex items-center gap-1.5 text-[11px] font-medium transition-colors self-start"
-        style={{ color: 'rgba(148,163,184,0.5)' }}
-      >
-        <span className="material-symbols-outlined text-sm transition-transform" style={{ transform: showAdvancedImage ? 'rotate(90deg)' : 'none' }} aria-hidden="true">chevron_right</span>
-        高级设置
-      </button>
-      {showAdvancedImage && (
-        <div className="flex flex-col p-3" style={{ gap: '12px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex flex-col" style={{ gap: '6px' }}>
-            <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>分辨率</span>
-            <div className="flex gap-2">
-              {(['720p', '1080p', '2K'] as ImageResolution[]).map((r) => (
-                <button key={r} onClick={() => setImageResolution(r)} className="flex-1 py-1.5 text-[11px] font-medium transition-all" style={{ borderRadius: '8px', backgroundColor: imageResolution === r ? 'rgba(0,102,255,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${imageResolution === r ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.06)'}`, color: imageResolution === r ? '#0066FF' : 'rgba(148,163,184,0.6)' }}>{r}</button>
-              ))}
-            </div>
-          </div>
+      {/* ── CTA Row ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.35)' }}>剩余算力</span>
+          <span className="text-[13px] font-bold" style={{ color: 'rgba(203,213,225,0.85)' }}>48,510</span>
         </div>
-      )}
-
-      {/* ── CTA Button ── */}
-      <div className="flex flex-col items-center" style={{ gap: '8px', marginTop: '4px', marginBottom: '4px' }}>
-        <button className="w-full py-3 text-white text-[13px] font-bold flex items-center justify-center gap-2 transition-all hover:brightness-110" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #0066FF 0%, #1a7fff 100%)', boxShadow: '0 4px 20px rgba(0,102,255,0.3)' }}>
-          <span className="material-symbols-outlined text-base" aria-hidden="true">image</span>
-          立即生图
-        </button>
-        <span id="tour-credits" className="text-[10px] cursor-pointer hover:text-purple-400 transition-colors" style={{ color: 'rgba(148,163,184,0.3)' }}>预计消耗 10 算力</span>
+        <div className="flex items-center gap-2">
+          <div id={isImage ? 'tour-credits' : undefined} className="flex items-center gap-1.5 px-3 py-1.5" style={{ borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#22d3ee' }}>electric_bolt</span>
+            <span className="text-[13px] font-bold text-white">{isImage ? 20 : 100}</span>
+          </div>
+          <button
+            onClick={() => {
+              if (isImage) {
+                const url = `https://picsum.photos/seed/${Date.now()}/400/400`
+                addMaterial({ type: 'image', url, prompt: imagePrompt || '图片生成', ratio: imageRatio, model: imageModel, source: 'editor' })
+              } else {
+                addMaterial({ type: 'video', url: '', prompt: videoPrompt || '视频生成', ratio: videoRatio, model: videoModel, duration: videoDuration, source: 'editor' })
+              }
+            }}
+            className="px-4 py-2 text-white text-[12px] font-bold flex items-center gap-1.5 transition-all hover:brightness-110"
+            style={{ borderRadius: '8px', background: 'linear-gradient(135deg, #0066FF 0%, #1a7fff 100%)', boxShadow: '0 4px 16px rgba(0,102,255,0.3)' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '14px' }} aria-hidden="true">{isImage ? 'image' : 'videocam'}</span>
+            {isImage ? '立即生图' : '立即生成'}
+          </button>
+        </div>
       </div>
 
       {/* ── 我的智能素材 ── */}
-      <div id="tour-my-smart-materials" className="flex flex-col" style={{ gap: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-sm" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">folder_special</span>
-          <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>我的智能素材</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {smartMaterials.filter(m => m.type === 'image').map((item) => (
-            <div
-              key={item.id}
-              className="relative aspect-square overflow-hidden cursor-pointer group"
-              style={{ borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-              onClick={() => { setImagePrompt(item.prompt); showToast('已填入提示词') }}
-            >
-              <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
-              {/* Hover: zoom top-right, use+download bottom-right */}
-              <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); setLightboxItem(item) }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="放大查看">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>zoom_in</span>
-                </button>
-              </div>
-              <div className="absolute bottom-0 right-0 p-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); showToast('已添加到轨道') }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="使用">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>add_circle</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); showToast('已开始下载') }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="下载">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>download</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); handleDeleteSmartMaterial(item.id) }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="删除">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>delete</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-
-  // ── Video Generation Panel ──
-  const VideoGeneratePanel = () => (
-    <div className="flex-1 overflow-y-auto flex flex-col p-5" style={{ scrollbarWidth: 'none', gap: '20px' }}>
-      {/* ── Prompt Input (full-width, auto-resize) ── */}
-      <div className="flex flex-col" style={{ gap: '12px' }}>
-        <textarea
-          value={videoPrompt}
-          onChange={(e) => { setVideoPrompt(e.target.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px' }}
-          className="w-full text-[13px] p-3 resize-none outline-none transition-all leading-relaxed"
-          style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'rgba(203,213,225,0.9)', minHeight: '80px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-          placeholder="描述你想要生成的视频画面…"
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,102,255,0.5)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,102,255,0.1)' }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)' }}
-          aria-label="画面描述"
-        />
-        {/* Reference image (below prompt, inline) */}
-        <button className="w-full h-16 flex items-center justify-center gap-2 transition-all" style={{ border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(148,163,184,0.4)' }} aria-label="上传参考图">
-          <span className="material-symbols-outlined text-lg" aria-hidden="true">add_photo_alternate</span>
-          <span className="text-[11px]">添加参考图</span>
-        </button>
-      </div>
-
-      {/* ── Ratio + Model: 2-col icon pill selectors ── */}
-      <div className="grid grid-cols-2" style={{ gap: '12px' }}>
-        {/* 比例 */}
-        <div className="relative flex flex-col" style={{ gap: '6px' }}>
-          <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>比例</span>
-          <button
-            onClick={() => setVideoPopover(videoPopover === 'ratio' ? null : 'ratio')}
-            className="flex items-center gap-2 px-3 py-2 transition-all"
-            style={{ borderRadius: '12px', backgroundColor: videoPopover === 'ratio' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${videoPopover === 'ratio' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
-          >
-            <span className="material-symbols-outlined text-sm" style={{ color: '#0066FF' }} aria-hidden="true">aspect_ratio</span>
-            <span className="text-[11px] font-medium flex-1 text-left truncate">{videoRatio.replace(' 宽屏', '').replace(' 竖屏', '').replace(' 方形', '')}</span>
-            <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">unfold_more</span>
-          </button>
-          {videoPopover === 'ratio' && (
-            <div className="absolute bottom-full left-0 mb-2 w-full overflow-hidden z-50" style={{ borderRadius: '12px', backgroundColor: 'rgba(22,23,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', animation: 'popup-up 0.2s ease-out' }}>
-              {(['16:9 宽屏', '9:16 竖屏', '4:3', '1:1 方形'] as VideoRatio[]).map((r) => (
-                <button key={r} onClick={() => { setVideoRatio(r); setVideoPopover(null) }} className="w-full px-3 py-2 text-left text-[11px] transition-colors hover:bg-white/5 flex items-center gap-2" style={{ color: videoRatio === r ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: videoRatio === r ? 600 : 400 }}>
-                  {videoRatio === r ? <span className="material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span> : <span className="w-4" />}
-                  {r}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {/* 模型 */}
-        <div className="relative flex flex-col" style={{ gap: '6px' }}>
-          <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>模型</span>
-          <button
-            onClick={() => setVideoPopover(videoPopover === 'model' ? null : 'model')}
-            className="flex items-center gap-2 px-3 py-2 transition-all"
-            style={{ borderRadius: '12px', backgroundColor: videoPopover === 'model' ? 'rgba(0,102,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${videoPopover === 'model' ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(203,213,225,0.9)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
-          >
-            <span className="material-symbols-outlined text-sm" style={{ color: '#0066FF' }} aria-hidden="true">{MODEL_ICONS[videoModel]}</span>
-            <span className="text-[11px] font-medium flex-1 text-left truncate">{videoModel}</span>
-            <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">unfold_more</span>
-          </button>
-          {videoPopover === 'model' && (
-            <div className="absolute bottom-full left-0 mb-2 w-full overflow-hidden z-50" style={{ borderRadius: '12px', backgroundColor: 'rgba(22,23,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', animation: 'popup-up 0.2s ease-out' }}>
-              {VIDEO_MODELS.map((m) => (
-                <button key={m} onClick={() => { setVideoModel(m); setVideoPopover(null) }} className="w-full px-3 py-2 text-left text-[11px] transition-colors hover:bg-white/5 flex items-center gap-2" style={{ color: videoModel === m ? '#0066FF' : 'rgba(203,213,225,0.8)', fontWeight: videoModel === m ? 600 : 400 }}>
-                  <span className="material-symbols-outlined text-sm" style={{ color: videoModel === m ? '#0066FF' : 'rgba(148,163,184,0.4)' }} aria-hidden="true">{MODEL_ICONS[m]}</span>
-                  {m}
-                  {videoModel === m && <span className="ml-auto material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Duration Slider ── */}
-      <div className="flex flex-col" style={{ gap: '8px' }}>
-        <div className="flex justify-between items-center">
-          <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>时长</span>
-          <span className="text-[11px] font-mono font-bold" style={{ color: '#0066FF' }}>{videoDuration}s</span>
-        </div>
-        <div className="relative flex items-center" style={{ height: '24px' }}>
+      <div id="tour-my-smart-materials" className="flex flex-col" style={{ gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">search</span>
           <input
-            type="range"
-            min={4}
-            max={15}
-            step={1}
-            value={videoDuration}
-            onChange={(e) => setVideoDuration(Number(e.target.value))}
-            className="w-full h-1 appearance-none outline-none cursor-pointer"
-            style={{ background: `linear-gradient(to right, #0066FF ${((videoDuration - 4) / 11) * 100}%, rgba(255,255,255,0.08) ${((videoDuration - 4) / 11) * 100}%)`, borderRadius: '4px', WebkitAppearance: 'none' }}
-            aria-label="视频时长"
+            type="text"
+            value={smartMaterialSearch}
+            onChange={e => setSmartMaterialSearch(e.target.value)}
+            placeholder="搜索素材…"
+            className="w-full rounded-lg text-xs py-2 pl-8 pr-3 outline-none transition-all"
+            style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid #222226', color: 'rgba(203,213,225,0.9)' }}
+            onFocus={e => { e.currentTarget.style.borderColor = '#0066FF' }}
+            onBlur={e => { e.currentTarget.style.borderColor = '#222226' }}
+            aria-label="搜索智能素材"
           />
         </div>
-        <div className="flex justify-between">
-          <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.3)' }}>4s</span>
-          <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.3)' }}>15s</span>
+        <div className="flex gap-1">
+          {(['图片', '视频'] as const).map(f => (
+            <button key={f} onClick={() => setSmartMaterialFilter(f)} className="px-2 py-0.5 text-[9px] font-medium rounded transition-all" style={{ backgroundColor: smartMaterialFilter === f ? '#0066FF' : 'rgba(255,255,255,0.05)', color: smartMaterialFilter === f ? 'white' : 'rgba(148,163,184,0.5)', border: `1px solid ${smartMaterialFilter === f ? '#0066FF' : 'rgba(255,255,255,0.06)'}` }}>{f}</button>
+          ))}
         </div>
-      </div>
-
-      {/* ── Advanced Settings (collapsible) ── */}
-      <button
-        onClick={() => setShowAdvancedVideo(v => !v)}
-        className="flex items-center gap-1.5 text-[11px] font-medium transition-colors self-start"
-        style={{ color: 'rgba(148,163,184,0.5)' }}
-      >
-        <span className="material-symbols-outlined text-sm transition-transform" style={{ transform: showAdvancedVideo ? 'rotate(90deg)' : 'none' }} aria-hidden="true">chevron_right</span>
-        高级设置
-      </button>
-      {showAdvancedVideo && (
-        <div className="flex flex-col p-3" style={{ gap: '12px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex flex-col" style={{ gap: '6px' }}>
-            <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(148,163,184,0.45)' }}>分辨率</span>
-            <div className="flex gap-2">
-              {(['720p', '1080p', '2K'] as VideoResolution[]).map((r) => (
-                <button key={r} onClick={() => setVideoResolution(r)} className="flex-1 py-1.5 text-[11px] font-medium transition-all" style={{ borderRadius: '8px', backgroundColor: videoResolution === r ? 'rgba(0,102,255,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${videoResolution === r ? 'rgba(0,102,255,0.4)' : 'rgba(255,255,255,0.06)'}`, color: videoResolution === r ? '#0066FF' : 'rgba(148,163,184,0.6)' }}>{r}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── CTA Button ── */}
-      <div className="flex flex-col items-center" style={{ gap: '8px', marginTop: '4px', marginBottom: '4px' }}>
-        <button className="w-full py-3 text-white text-[13px] font-bold flex items-center justify-center gap-2 transition-all hover:brightness-110" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #0066FF 0%, #1a7fff 100%)', boxShadow: '0 4px 20px rgba(0,102,255,0.3)' }}>
-          <span className="material-symbols-outlined text-base" aria-hidden="true">videocam</span>
-          立即生成
-        </button>
-        <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>预计消耗 300 算力</span>
-      </div>
-
-      {/* ── 我的智能素材 ── */}
-      <div className="flex flex-col" style={{ gap: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-sm" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">folder_special</span>
-          <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>我的智能素材</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {smartMaterials.filter(m => m.type === 'video').map((item) => (
+        <div className="grid grid-cols-3 gap-1.5">
+          {smartMaterials
+            .filter(m => m.type === (smartMaterialFilter === '图片' ? 'image' : 'video'))
+            .filter(m => !smartMaterialSearch || m.prompt.toLowerCase().includes(smartMaterialSearch.toLowerCase()))
+            .map((item) => (
             <div
               key={item.id}
-              className="relative aspect-video overflow-hidden cursor-pointer group"
-              style={{ borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-              onClick={() => {
-                setVideoPrompt(item.prompt)
-                if (item.ratio) setVideoRatio(item.ratio as VideoRatio)
-                if (item.model) setVideoModel(item.model as VideoModel)
-                if (item.duration) setVideoDuration(item.duration)
-                showToast('已填入参数')
-              }}
+              className="relative overflow-hidden cursor-pointer group"
+              style={{ borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.04)', aspectRatio: item.type === 'video' ? '16/9' : '1/1' }}
+              onClick={() => { if (item.type === 'image') setImagePrompt(item.prompt); else { if (item.ratio) setVideoRatio(item.ratio as VideoRatio); if (item.model) setVideoModel(item.model as VideoModel); if (item.duration) setVideoDuration(item.duration) } }}
             >
-              <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,102,255,0.08), rgba(112,0,255,0.08))' }}>
-                <span className="material-symbols-outlined text-xl" style={{ color: 'rgba(148,163,184,0.2)' }} aria-hidden="true">movie</span>
+              {item.type === 'image' ? (
+                <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,102,255,0.08), rgba(112,0,255,0.08))' }}>
+                  <span className="material-symbols-outlined text-xl" style={{ color: 'rgba(148,163,184,0.2)' }}>movie</span>
+                </div>
+              )}
+              <div className="absolute bottom-0.5 right-0.5 px-1 py-px" style={{ backgroundColor: item.type === 'video' ? 'rgba(112,0,255,0.6)' : 'rgba(0,0,0,0.55)', borderRadius: '3px' }}>
+                <span className="text-[8px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{item.type === 'video' ? '视频' : 'AI生成'}</span>
               </div>
-              {/* Play button — clicking opens lightbox */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setLightboxItem(item) }}
-                  className="w-7 h-7 rounded-full flex items-center justify-center transition-transform hover:scale-110"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-                  aria-label="播放视频"
-                >
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '16px' }} aria-hidden="true">play_arrow</span>
-                </button>
-              </div>
-              {/* Hover: use + download icons at bottom-right */}
-              <div className="absolute bottom-0 right-0 p-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); showToast('已添加到轨道') }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="使用">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>add_circle</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); showToast('已开始下载') }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="下载">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>download</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); handleDeleteSmartMaterial(item.id) }} className="w-6 h-6 flex items-center justify-center" style={{ borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} aria-label="删除">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>delete</span>
-                </button>
-              </div>
-              {/* Prompt label at bottom */}
-              <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.7))' }}>
-                <span className="text-[9px] text-white/70 truncate block">{item.prompt}</span>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-0.5">
+                <div className="flex justify-end">
+                  <button onClick={(e) => { e.stopPropagation(); setLightboxItem(item) }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="放大查看">
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>zoom_in</span>
+                  </button>
+                </div>
+                <div className="flex justify-end gap-0.5">
+                  <button onClick={(e) => { e.stopPropagation() }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="使用">
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>add_circle</span>
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation() }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="下载">
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>download</span>
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteMaterial(item.id) }} className="w-5 h-5 flex items-center justify-center" style={{ borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.75)' }} aria-label="删除">
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>delete</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       </div>
     </div>
-  )
+    )
+  }
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden text-slate-300" style={{ backgroundColor: '#050505', fontFamily: "'Public Sans', 'Inter', sans-serif" }}>
@@ -735,8 +1010,8 @@ function ProfessionalEditPage() {
             <span className="font-bold text-lg text-white">讯飞智作</span>
           </div>
           <div className="h-4 w-px" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}></div>
-          <button onClick={() => navigate('/storyboard')} className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_back</span>返回分镜
+          <button onClick={() => navigate('/')} className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_back</span>返回首页
           </button>
           <div className="ml-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(0,102,255,0.1)', border: '1px solid rgba(0,102,255,0.2)', color: '#0066FF' }}>AI 共创</div>
         </div>
@@ -764,62 +1039,86 @@ function ProfessionalEditPage() {
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Icon Sidebar ── */}
-        <aside className="w-16 flex flex-col items-center py-4 border-r shrink-0" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
-          <nav className="flex flex-col gap-1 w-full" aria-label="工具栏">
-            {SIDEBAR_TOOLS.map(({ icon, label }) => {
+        {/* ── Icon Sidebar (full height, spans body + timeline) ── */}
+        <aside className="w-16 flex flex-col border-r shrink-0" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
+          <nav className="flex flex-col gap-0.5 w-full overflow-y-auto flex-1" style={{ scrollbarWidth: 'none' }} aria-label="工具栏">
+            {SIDEBAR_TOOLS.map(({ icon, label, aiPlus }) => {
               const active = activeTool === label
               return (
-                <button key={label} onClick={() => setActiveTool(label)} className="flex flex-col items-center gap-1 cursor-pointer transition-colors py-2 w-full" style={{ color: active ? '#0066FF' : 'rgba(148,163,184,0.5)', borderLeft: active ? '2px solid #0066FF' : '2px solid transparent', backgroundColor: active ? 'rgba(0,102,255,0.05)' : 'transparent' }} aria-label={label} aria-pressed={active}>
-                  <span className="material-symbols-outlined text-xl" aria-hidden="true">{icon}</span>
-                  <span className="text-[10px]">{label}</span>
+                <button key={label} onClick={() => { setActiveTool(label); setSelectedTrack(null) }} className="relative flex flex-col items-center gap-0.5 cursor-pointer transition-colors py-2.5 w-full shrink-0" style={{ color: active ? '#0066FF' : 'rgba(148,163,184,0.5)', borderLeft: active ? '2px solid #0066FF' : '2px solid transparent', backgroundColor: active ? 'rgba(0,102,255,0.05)' : 'transparent' }} aria-label={label} aria-pressed={active}>
+                  <div className="relative">
+                    <span className="material-symbols-outlined" style={{ fontSize: '22px' }} aria-hidden="true">{icon}</span>
+                    {aiPlus && <span className="absolute -top-1 -right-2 text-[7px] font-black px-0.5 rounded" style={{ backgroundColor: '#0066FF', color: 'white', lineHeight: '1.4' }}>AI+</span>}
+                  </div>
+                  <span className="text-[9px] leading-tight text-center">{label}</span>
                 </button>
               )
             })}
+            {/* ── 素材优化 (appears when track selected) ── */}
+            {selectedTrack && (() => {
+              const active = activeTool === '素材优化'
+              return (
+                <>
+                  <div className="mx-2 my-1" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                  <button onClick={() => setActiveTool('素材优化')} className="relative flex flex-col items-center gap-0.5 cursor-pointer transition-colors py-2.5 w-full shrink-0" style={{ color: active ? '#0066FF' : 'rgba(148,163,184,0.5)', borderLeft: active ? '2px solid #0066FF' : '2px solid transparent', backgroundColor: active ? 'rgba(0,102,255,0.05)' : 'transparent' }} aria-label="素材优化" aria-pressed={active}>
+                    <div className="relative">
+                      <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>auto_fix_high</span>
+                      <span className="absolute -top-1 -right-2 text-[7px] font-black px-0.5 rounded" style={{ backgroundColor: 'rgba(255,165,0,0.9)', color: 'white', lineHeight: '1.4' }}>新</span>
+                    </div>
+                    <span className="text-[9px] leading-tight text-center">素材优化</span>
+                  </button>
+                </>
+              )
+            })()}
           </nav>
         </aside>
 
-        {/* ── Left Panel ── */}
-        <aside id="tour-material-panel" className="w-72 flex flex-col border-r shrink-0 overflow-hidden" style={{ backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
-          <div className="flex border-b shrink-0" style={{ borderColor: '#222226' }}>
-            {(['本地素材', '智能素材'] as MaterialTab[]).map((tab) => (
-              <button key={tab} id={tab === '智能素材' ? 'tour-smart-material-tab' : undefined} onClick={() => setMaterialTab(tab)} className="flex-1 py-3 text-xs font-medium transition-colors" style={{ color: materialTab === tab ? '#0066FF' : 'rgba(148,163,184,0.6)', borderBottom: materialTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: materialTab === tab ? 700 : 500 }}>{tab}</button>
-            ))}
-          </div>
-          {materialTab === '智能素材' && (
-            <div className="flex p-2 shrink-0" style={{ borderBottom: '1px solid #222226' }}>
-              <div className="flex w-full p-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                {(['图片生成', '视频生成'] as GenerateTab[]).map((tab) => (
-                  <button key={tab} onClick={() => setGenerateTab(tab)} className="flex-1 py-1.5 text-xs font-medium rounded transition-all" style={{ color: generateTab === tab ? 'white' : 'rgba(148,163,184,0.6)', backgroundColor: generateTab === tab ? 'rgba(255,255,255,0.1)' : 'transparent', fontWeight: generateTab === tab ? 700 : 500 }}>{tab}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {materialTab === '本地素材' ? <LocalMaterialsPanel /> : generateTab === '图片生成' ? <ImageGeneratePanel /> : <VideoGeneratePanel />}
-        </aside>
+        {/* ── Right column: [Left Panel + Canvas] above [Timeline] ── */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Main Canvas ── */}
-        <main className="flex-1 flex flex-col" style={{ backgroundColor: '#050505' }}>
-          <div className="flex-1 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <div className="w-full max-w-3xl aspect-video rounded shadow-2xl overflow-hidden relative group" style={{ backgroundColor: 'black', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.12)' }}>
-                <div className="flex flex-col items-center gap-3">
-                  <span className="material-symbols-outlined text-6xl" aria-hidden="true">movie</span>
-                  <span className="text-sm">画布预览区域</span>
+            {/* ── Left Panel (resizable) ── */}
+            <aside id="tour-material-panel" className="flex flex-col border-r shrink-0 overflow-hidden relative" style={{ width: `${leftPanelWidth}px`, backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
+              {activeTool === '素材优化' && selectedTrack ? (
+                <MaterialOptimizePanel />
+              ) : (
+                <>
+                  <div className="flex border-b shrink-0" style={{ borderColor: '#222226' }}>
+                    {(['本地素材', '智能素材'] as MaterialTab[]).map((tab) => (
+                      <button key={tab} id={tab === '智能素材' ? 'tour-smart-material-tab' : undefined} onClick={() => setMaterialTab(tab)} className="flex-1 py-3 text-xs font-medium transition-colors" style={{ color: materialTab === tab ? '#0066FF' : 'rgba(148,163,184,0.6)', borderBottom: materialTab === tab ? '2px solid #0066FF' : '2px solid transparent', fontWeight: materialTab === tab ? 700 : 500 }}>{tab}</button>
+                    ))}
+                  </div>
+                  {materialTab === '本地素材' ? <LocalMaterialsPanel /> : <SmartGeneratePanel />}
+                </>
+              )}
+              {/* Drag handle */}
+              <div onMouseDown={handleLeftResizeStart} className="absolute top-0 right-0 w-1 h-full cursor-col-resize transition-colors hover:bg-blue-500/30" style={{ zIndex: 10 }} />
+            </aside>
+
+            {/* ── Main Canvas ── */}
+            <main className="flex-1 flex flex-col" style={{ backgroundColor: '#050505' }}>
+              <div className="flex-1 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                <div className="w-full max-w-3xl aspect-video rounded shadow-2xl overflow-hidden relative group" style={{ backgroundColor: 'black', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.12)' }}>
+                    <div className="flex flex-col items-center gap-3">
+                      <span className="material-symbols-outlined text-6xl" aria-hidden="true">movie</span>
+                      <span className="text-sm">画布预览区域</span>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center border transition-transform duration-300 group-hover:scale-110" style={{ backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)', borderColor: 'rgba(255,255,255,0.2)' }}>
+                      <span className="material-symbols-outlined text-white text-4xl ml-1" aria-hidden="true">play_arrow</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center border transition-transform duration-300 group-hover:scale-110" style={{ backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)', borderColor: 'rgba(255,255,255,0.2)' }}>
-                  <span className="material-symbols-outlined text-white text-4xl ml-1" aria-hidden="true">play_arrow</span>
-                </div>
-              </div>
-            </div>
+            </main>
           </div>
-        </main>
-      </div>
 
-      {/* ── Timeline ── */}
-      <div className="shrink-0 flex flex-col" style={{ height: '256px', backgroundColor: '#0A0A0B', borderTop: '1px solid #222226' }}>
+          {/* ── Timeline (resizable, to the right of icon sidebar) ── */}
+          <div className="shrink-0 flex flex-col relative" style={{ height: `${timelineHeight}px`, backgroundColor: '#0A0A0B', borderTop: '1px solid #222226' }}>
+            {/* Resize handle on top */}
+            <div onMouseDown={handleTimelineResizeStart} className="absolute top-0 left-0 right-0 h-1 cursor-row-resize transition-colors hover:bg-blue-500/30" style={{ zIndex: 10 }} />
         {/* Toolbar */}
         <div className="h-8 flex items-center shrink-0" style={{ borderBottom: '1px solid #222226', backgroundColor: 'rgba(255,255,255,0.02)' }}>
           <div className="w-16 flex items-center justify-center shrink-0 h-full" style={{ borderRight: '1px solid #222226' }}>
@@ -890,11 +1189,14 @@ function ProfessionalEditPage() {
                       backgroundColor: clip01Muted ? 'rgba(0,102,255,0.06)' : 'rgba(0,102,255,0.2)',
                       borderLeft: `2px solid ${clip01Muted ? 'rgba(0,102,255,0.25)' : '#0066FF'}`,
                       opacity: clip01Muted ? 0.55 : 1,
-                      cursor: clip01Loading ? 'not-allowed' : 'context-menu',
+                      cursor: clip01Loading ? 'not-allowed' : 'pointer',
                       transition: 'opacity 0.3s, background-color 0.3s',
+                      outline: selectedTrack?.id === 'clip01' ? '2px solid #0066FF' : 'none',
+                      outlineOffset: '1px',
                     }}
+                    onClick={() => { if (!clip01Loading) { setSelectedTrack(TRACK_CLIPS[0]); setActiveTool('素材优化'); setOptimizeTab('素材更换') } }}
                     onContextMenu={handleClip01ContextMenu}
-                    title={clip01Loading ? '处理中，暂不可操作' : '右键查看操作'}
+                    title={clip01Loading ? '处理中，暂不可操作' : '点击选中，右键查看操作'}
                   >
                     <div className="w-10 h-full opacity-50 rounded shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}></div>
                     <span className="text-[10px] truncate flex-1" style={{ color: '#93c5fd' }}>Clip_01.mp4</span>
@@ -934,12 +1236,42 @@ function ProfessionalEditPage() {
               </div>
             )}
 
-            {/* Video Track 2 (empty placeholder) */}
+            {/* Video Track 2 – 本地上传素材 */}
             <div className="h-12 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div className="w-16 shrink-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(148,163,184,0.25)' }} aria-hidden="true">videocam_off</span>
+              <div className="w-16 shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ backgroundColor: 'rgba(34,197,94,0.04)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(134,239,172,0.6)' }} aria-hidden="true">image</span>
+                <span className="text-[8px]" style={{ color: 'rgba(134,239,172,0.4)' }}>V2</span>
               </div>
-              <div className="flex-1" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}></div>
+              <div className="flex-1 relative p-1" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                <div
+                  className="absolute rounded px-2 flex items-center gap-2 overflow-hidden select-none cursor-pointer group"
+                  style={{
+                    left: `${CLIP_LEFT + CLIP_WIDTH + 12}px`,
+                    width: '140px',
+                    height: '40px',
+                    top: '2px',
+                    backgroundColor: selectedTrack?.id === 'local01' ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.12)',
+                    borderLeft: '2px solid rgba(34,197,94,0.6)',
+                    outline: selectedTrack?.id === 'local01' ? '2px solid #60A5FA' : 'none',
+                    outlineOffset: '1px',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onClick={() => { setSelectedTrack(TRACK_CLIPS[1]); setActiveTool('素材优化'); setOptimizeTab('动画效果') }}
+                  title="点击选中，进入素材优化"
+                >
+                  {/* Thumbnail strip */}
+                  <div className="w-8 h-full rounded shrink-0 overflow-hidden" style={{ backgroundColor: 'rgba(34,197,94,0.15)' }}>
+                    <img src="https://picsum.photos/seed/local01/32/40" alt="" className="w-full h-full object-cover opacity-70" />
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[10px] truncate font-medium" style={{ color: '#86efac' }}>photo_001.jpg</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[8px] px-1 py-px rounded font-bold" style={{ backgroundColor: 'rgba(34,197,94,0.2)', color: 'rgba(134,239,172,0.8)' }}>本地</span>
+                      <span className="text-[8px]" style={{ color: 'rgba(134,239,172,0.4)' }}>2.3s</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Background Audio Track */}
@@ -991,6 +1323,8 @@ function ProfessionalEditPage() {
           </div>
         </div>
       </div>
+          </div> {/* end right column */}
+      </div> {/* end body */}
 
       {/* ══ Context Menu ══ */}
       {contextMenu && (

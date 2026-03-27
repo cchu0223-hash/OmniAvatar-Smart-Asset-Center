@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import TextType from './TextType'
 import { useNavigate } from 'react-router-dom'
 import { useTour } from './useTour'
+import { addMaterial } from './smartMaterialsStore'
 
 type GenerationCategory = 'image' | 'video'
 type AspectRatio = '1:1' | '3:4' | '4:3' | '16:9' | '9:16'
@@ -364,10 +365,17 @@ function App() {
         {/* Header */}
         <header className="flex items-center justify-between border-b border-white/5 px-6 py-4 lg:px-20 bg-[#0B0C10]/60 backdrop-blur-xl sticky top-0 z-50">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center rounded-xl text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] ring-1 ring-white/10">
-              <span className="material-symbols-outlined fill-1" style={{ fontSize: '24px' }}>movie_filter</span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center rounded-xl text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] ring-1 ring-white/10">
+                <span className="material-symbols-outlined fill-1" style={{ fontSize: '24px' }}>movie_filter</span>
+              </div>
+              <h2 className="text-lg font-semibold tracking-wide text-white/90">讯飞智作</h2>
             </div>
-            <h2 className="text-lg font-semibold tracking-wide text-white/90">讯飞智作</h2>
+            <div className="h-4 w-px bg-white/10" />
+            <button onClick={() => navigate('/professional-edit')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>movie_edit</span>
+              专业剪辑
+            </button>
           </div>
           <div className="flex items-center gap-5">
             <div id="tour-credits" className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-colors">
@@ -918,7 +926,7 @@ function App() {
                                             {/* Top-right: bookmark */}
                                             <div className="absolute top-1 right-1">
                                               <button
-                                                onClick={(e) => { e.stopPropagation() }}
+                                                onClick={(e) => { e.stopPropagation(); addMaterial({ type: 'image', url: thumb, prompt: task.prompt, ratio: task.aspectRatio, model: task.model, source: 'studio' }) }}
                                                 className="w-6 h-6 flex items-center justify-center rounded-md bg-black/60 backdrop-blur-sm hover:bg-accent-purple/70 transition-colors"
                                                 aria-label="收藏至我的素材"
                                               >
@@ -1074,7 +1082,7 @@ function App() {
                                         再次生成
                                       </button>
                                       <button
-                                        onClick={(e) => { e.stopPropagation() }}
+                                        onClick={(e) => { e.stopPropagation(); addMaterial({ type: 'video', url: '', prompt: task.prompt, ratio: task.aspectRatio, model: task.model, duration: task.duration, source: 'studio' }) }}
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 hover:bg-accent-purple/10 hover:text-accent-purple transition-all"
                                       >
                                         <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bookmark_add</span>
