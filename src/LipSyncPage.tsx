@@ -22,6 +22,15 @@ export default function LipSyncPage() {
     return () => clearTimeout(timer)
   }, [stage])
 
+  // 键盘 D 键显示/隐藏调试器
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'd' || e.key === 'D') setShowDebug(v => !v)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white">
       {/* 开发用：状态切换器（按 D 键显示/隐藏） */}
@@ -45,17 +54,6 @@ export default function LipSyncPage() {
           </div>
         </div>
       )}
-
-      {/* 监听键盘事件显示调试器 */}
-      <div
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'd' || e.key === 'D') {
-            setShowDebug(!showDebug)
-          }
-        }}
-        className="outline-none"
-      >
 
       {/* Header 导航栏 */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#141414] border-b border-white/8">
