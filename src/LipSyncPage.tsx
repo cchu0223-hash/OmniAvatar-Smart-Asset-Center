@@ -3,24 +3,56 @@ import { useState, useEffect } from 'react'
 // 状态机类型定义
 type LipSyncStage = 'idle' | 'uploading' | 'parsing' | 'editing' | 'generating'
 
+// 任务类型定义
+interface LipSyncTask {
+  id: string
+  name: string
+  status: 'processing' | 'success' | 'failed'
+  progress: number
+  targetLanguage: string
+  duration: string
+  createdAt: number
+  thumbnail?: string
+  downloadUrl?: string
+}
+
 export default function LipSyncPage() {
   const [stage, setStage] = useState<LipSyncStage>('idle')
   const [showDebug, setShowDebug] = useState(false)
+  const [tasks, setTasks] = useState<LipSyncTask[]>([])
+  const [activeTab, setActiveTab] = useState<'recommend' | 'mine'>('recommend')
 
   // 自动状态流转
   useEffect(() => {
     let timer: NodeJS.Timeout
 
     if (stage === 'uploading') {
-      // 模拟上传 2 秒后自动进入解析
       timer = setTimeout(() => setStage('parsing'), 2000)
     } else if (stage === 'parsing') {
-      // 模拟解析 3 秒后自动进入编辑
       timer = setTimeout(() => setStage('editing'), 3000)
     }
 
     return () => clearTimeout(timer)
   }, [stage])
+
+  // 进度模拟
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTasks(prev => prev.map(task => {
+        if (task.status === 'processing' && task.progress < 100) {
+          const newProgress = Math.min(task.progress + Math.random() * 5, 100)
+          return {
+            ...task,
+            progress: newProgress,
+            status: newProgress >= 100 ? 'success' : 'processing'
+          }
+        }
+        return task
+      }))
+    }, 300)
+
+    return () => clearInterval(timer)
+  }, [])
 
   // 键盘 D 键显示/隐藏调试器
   useEffect(() => {
@@ -83,26 +115,35 @@ export default function LipSyncPage() {
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid grid-cols-2 gap-12 items-center">
             {/* 左侧：标题 + 上传/编辑模块 */}
-            <LeftSection stage={stage} setStage={setStage} />
+            <LeftSection
+              stage={stage}
+              setStage={setStage}
+              setActiveTab={setActiveTab}
+              onCreateTask={(task) => setTasks(prev => [task, ...prev])}
+            />
 
             {/* 右侧：视频展示区 */}
             <RightVideoSection stage={stage} />
           </div>
         </div>
 
-        {/* Tab 区 - 始终显示 */}
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <TabSection />
-        </div>
+        {/* Tab 区 - 仅 idle 时显示 */}
+        {stage === 'idle' && (
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <TabSection activeTab={activeTab} setActiveTab={setActiveTab} tasks={tasks} setTasks={setTasks} />
+          </div>
+        )}
       </main>
     </div>
   )
 }
 
 // 左侧区域 - 根据状态切换
-function LeftSection({ stage, setStage }: {
+function LeftSection({ stage, setStage, setActiveTab, onCreateTask }: {
   stage: LipSyncStage
   setStage: (stage: LipSyncStage) => void
+  setActiveTab: (tab: 'mine' | 'recommend') => void
+  onCreateTask: (task: LipSyncTask) => void
 }) {
   if (stage === 'idle') {
     return <LeftIdle onUpload={() => setStage('uploading')} />
@@ -113,8 +154,22 @@ function LeftSection({ stage, setStage }: {
     <div className="space-y-6">
       {stage === 'uploading' && <UploadingProgress />}
       {stage === 'parsing' && <ParsingProgress />}
-      {stage === 'editing' && <EditingModule onGenerate={() => setStage('generating')} onBack={() => setStage('idle')} />}
-      {stage === 'generating' && <GeneratingModule onReset={() => setStage('idle')} />}
+      {stage === 'editing' && <EditingModule onGenerate={() => {
+        // 创建任务
+        const newTask: LipSyncTask = {
+          id: Date.now().toString(),
+          name: '示例视频.mp4',
+          status: 'processing',
+          progress: 0,
+          targetLanguage: '英语 (EN)',
+          duration: '02:30',
+          createdAt: Date.now()
+        }
+        onCreateTask(newTask)
+        // 立即回到 idle + 切换到「我的」Tab
+        setStage('idle')
+        setActiveTab('mine')
+      }} onBack={() => setStage('idle')} />}
     </div>
   )
 }
@@ -294,8 +349,13 @@ function GeneratingModule({ onReset }: { onReset: () => void }) {
 }
 
 // Tab 区组件
-function TabSection() {
-  const [activeTab, setActiveTab] = useState<'recommend' | 'mine'>('recommend')
+function TabSection({ activeTab, setActiveTab, tasks, setTasks }: {
+  activeTab: 'recommend' | 'mine'
+  setActiveTab: (tab: 'recommend' | 'mine') => void
+  tasks: LipSyncTask[]
+  setTasks: React.Dispatch<React.SetStateAction<LipSyncTask[]>>
+}) {
+  const processingCount = tasks.filter(t => t.status === 'processing').length
 
   return (
     <div className="space-y-6">
@@ -313,19 +373,22 @@ function TabSection() {
         </button>
         <button
           onClick={() => setActiveTab('mine')}
-          className={`pb-3 text-lg font-medium ${
+          className={`pb-3 text-lg font-medium relative ${
             activeTab === 'mine'
               ? 'text-white border-b-2 border-[#0066FF]'
               : 'text-slate-400'
           }`}
         >
           我的
+          {processingCount > 0 && (
+            <span className="absolute -top-1 -right-4 w-2 h-2 rounded-full bg-[#22d3ee] animate-pulse" />
+          )}
         </button>
       </div>
 
       {/* Tab 内容 */}
       {activeTab === 'recommend' && <RecommendTab />}
-      {activeTab === 'mine' && <MineTab />}
+      {activeTab === 'mine' && <MineTab tasks={tasks} setTasks={setTasks} />}
     </div>
   )
 }
@@ -342,10 +405,104 @@ function RecommendTab() {
 }
 
 // 我的 Tab
-function MineTab() {
+function MineTab({ tasks, setTasks }: {
+  tasks: LipSyncTask[]
+  setTasks: React.Dispatch<React.SetStateAction<LipSyncTask[]>>
+}) {
+  if (tasks.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <div className="text-5xl mb-4">🎬</div>
+        <p className="text-slate-400 text-lg">还没有对口型任务</p>
+        <p className="text-slate-500 text-sm mt-2">在上方上传视频开始创作</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      <p className="text-center text-slate-400 py-12">还没有作品</p>
+      {tasks.map(task => (
+        <TaskCard key={task.id} task={task} onDelete={(id) => setTasks(prev => prev.filter(t => t.id !== id))} />
+      ))}
+    </div>
+  )
+}
+
+// 任务卡片
+function TaskCard({ task, onDelete }: { task: LipSyncTask; onDelete: (id: string) => void }) {
+  const statusConfig = {
+    processing: { label: '处理中', color: 'bg-yellow-500/20 text-yellow-400' },
+    success: { label: '成功', color: 'bg-green-500/20 text-green-400' },
+    failed: { label: '失败', color: 'bg-red-500/20 text-red-400' }
+  }
+
+  const { label, color } = statusConfig[task.status]
+  const time = new Date(task.createdAt).toLocaleString('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
+  })
+
+  return (
+    <div className="flex items-center gap-4 p-4 bg-[#141414] rounded-xl border border-white/5 hover:border-white/10 transition-colors">
+      {/* 缩略图 */}
+      <div className="w-28 h-16 bg-white/5 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden relative">
+        <span className="text-2xl">🎬</span>
+        {/* 处理中：叠加进度 */}
+        {task.status === 'processing' && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#0066FF" strokeWidth="3"
+                strokeDasharray={`${task.progress * 0.88} 88`} strokeLinecap="round"
+                style={{ transition: 'stroke-dasharray 0.3s ease' }} />
+            </svg>
+            <span className="absolute text-xs font-mono text-white">{Math.round(task.progress)}%</span>
+          </div>
+        )}
+      </div>
+
+      {/* 信息区 */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium truncate">{task.name}</span>
+          <span className={`px-2 py-0.5 text-xs rounded-full ${color}`}>{label}</span>
+          <span className="px-2 py-0.5 text-xs rounded-full bg-[#0066FF]/20 text-[#60A5FA]">{task.targetLanguage}</span>
+        </div>
+        <div className="text-xs text-slate-500">
+          {task.duration} · {time}
+        </div>
+
+        {/* 处理中：进度条 */}
+        {task.status === 'processing' && (
+          <div className="mt-2 w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-[#0066FF] to-[#60A5FA] rounded-full transition-all duration-300"
+              style={{ width: `${task.progress}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 操作按钮 */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {task.status === 'success' && (
+          <>
+            <button className="px-3 py-1.5 text-xs bg-[#0066FF] rounded-lg hover:opacity-90">下载</button>
+            <button className="px-3 py-1.5 text-xs bg-white/5 rounded-lg hover:bg-white/10">重新编辑</button>
+          </>
+        )}
+        {task.status === 'failed' && (
+          <button className="px-3 py-1.5 text-xs bg-white/5 rounded-lg hover:bg-white/10">重新编辑</button>
+        )}
+        {task.status !== 'processing' && (
+          <button
+            onClick={() => onDelete(task.id)}
+            className="px-3 py-1.5 text-xs text-red-400 bg-white/5 rounded-lg hover:bg-red-500/10"
+          >
+            删除
+          </button>
+        )}
+      </div>
     </div>
   )
 }
