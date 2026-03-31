@@ -8,6 +8,26 @@ export default function LipSyncPage() {
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white">
+      {/* 开发用：状态切换器 */}
+      <div className="fixed bottom-4 right-4 z-50 bg-[#141414] border border-white/20 rounded-xl p-4 shadow-2xl">
+        <div className="text-xs text-slate-400 mb-2">开发调试 - 状态切换</div>
+        <div className="flex gap-2">
+          {(['idle', 'uploading', 'parsing', 'editing', 'generating'] as LipSyncStage[]).map(s => (
+            <button
+              key={s}
+              onClick={() => setStage(s)}
+              className={`px-3 py-1 text-xs rounded ${
+                stage === s
+                  ? 'bg-[#0066FF] text-white'
+                  : 'bg-white/5 text-slate-400 hover:bg-white/10'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Header 导航栏 */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#141414] border-b border-white/8">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
