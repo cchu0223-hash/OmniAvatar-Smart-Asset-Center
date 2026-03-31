@@ -34,12 +34,12 @@ export default function LipSyncPage() {
       <main className="pt-16">
         {/* Hero 区 - 双列布局 */}
         <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-2 gap-8 items-start">
-            {/* 左侧：品牌视频 */}
-            <BrandVideo />
+          <div className="grid grid-cols-2 gap-12 items-center">
+            {/* 左侧：标题 + 上传/编辑模块 */}
+            <LeftSection stage={stage} setStage={setStage} />
 
-            {/* 右侧：上传功能模块 */}
-            <UploadModule stage={stage} setStage={setStage} />
+            {/* 右侧：视频展示区 */}
+            <RightVideoSection stage={stage} />
           </div>
         </div>
 
@@ -52,63 +52,86 @@ export default function LipSyncPage() {
   )
 }
 
-// 品牌视频组件
-function BrandVideo() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold mb-3">AI 智能对口型</h1>
-        <p className="text-lg text-slate-400">多语种视频配音，让你的内容走向全球</p>
-      </div>
-
-      {/* 品牌视频 */}
-      <div className="w-full aspect-video bg-[#141414] rounded-2xl overflow-hidden">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="w-full h-full object-cover"
-        >
-          <source src="/brand-video.mp4" type="video/mp4" />
-        </video>
-      </div>
-    </div>
-  )
-}
-
-// 上传功能模块 - 根据状态切换
-function UploadModule({ stage, setStage }: {
+// 左侧区域 - 根据状态切换
+function LeftSection({ stage, setStage }: {
   stage: LipSyncStage
   setStage: (stage: LipSyncStage) => void
 }) {
+  if (stage === 'idle') {
+    return <LeftIdle onUpload={() => setStage('uploading')} />
+  }
+
+  // 上传中、解析中、编辑、生成 - 显示操作模块
   return (
-    <div className="bg-[#141414] rounded-2xl p-8 min-h-[500px]">
-      {stage === 'idle' && <UploadIdle onUpload={() => setStage('uploading')} />}
+    <div className="space-y-6">
       {stage === 'uploading' && <UploadingProgress />}
       {stage === 'parsing' && <ParsingProgress />}
-      {stage === 'editing' && <EditingModule />}
+      {stage === 'editing' && <EditingModule onGenerate={() => setStage('generating')} />}
       {stage === 'generating' && <GeneratingModule onReset={() => setStage('idle')} />}
     </div>
   )
 }
 
-// 上传空态
-function UploadIdle({ onUpload }: { onUpload: () => void }) {
+// 左侧空态 - 标题 + 上传
+function LeftIdle({ onUpload }: { onUpload: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-6">
-      <div className="w-full border-2 border-dashed border-white/20 rounded-xl p-12 text-center hover:border-[#0066FF] transition-colors cursor-pointer">
-        <div className="text-6xl mb-4">📁</div>
-        <p className="text-lg mb-2">拖拽视频文件到此处</p>
-        <p className="text-sm text-slate-400 mb-4">或</p>
-        <button
-          onClick={onUpload}
-          className="px-6 py-3 bg-gradient-to-r from-[#0066FF] to-[#60A5FA] rounded-xl font-medium hover:opacity-90"
-        >
-          点击上传视频
-        </button>
+    <div className="space-y-8">
+      {/* 标题区 */}
+      <div className="space-y-4">
+        <h1 className="text-5xl font-bold leading-tight">
+          AI 智能对口型
+        </h1>
+        <p className="text-2xl text-[#0066FF] font-medium">
+          多语种视频配音，让你的内容走向全球！
+        </p>
+        <p className="text-lg text-slate-400 leading-relaxed">
+          比传统配音更易用、更安全！从整理信息、写内容、看数据到执行
+          行网页任务，用更轻松的方式，帮你完成各种多语种视频制作任务。
+        </p>
       </div>
-      <p className="text-sm text-slate-400">支持 MP4、MOV 格式，≤5分钟，≤500MB</p>
+
+      {/* 上传按钮 */}
+      <button
+        onClick={onUpload}
+        className="px-8 py-4 bg-gradient-to-r from-[#0066FF] to-[#60A5FA] rounded-xl text-lg font-medium hover:opacity-90 transition-opacity"
+      >
+        立即上传视频
+      </button>
+    </div>
+  )
+}
+
+// 右侧视频展示区
+function RightVideoSection({ stage }: { stage: LipSyncStage }) {
+  // idle/uploading/parsing 时显示案例视频
+  if (stage === 'idle' || stage === 'uploading' || stage === 'parsing') {
+    return (
+      <div className="relative">
+        <div className="aspect-[4/5] bg-gradient-to-br from-[#141414] to-[#1a1a1a] rounded-3xl overflow-hidden shadow-2xl">
+          {/* 案例视频占位 */}
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-6xl">🎬</div>
+              <p className="text-slate-400">案例视频展示</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // editing/generating 时显示用户上传的视频
+  return (
+    <div className="relative">
+      <div className="aspect-video bg-[#141414] rounded-2xl overflow-hidden shadow-2xl">
+        {/* 用户上传的视频 */}
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="text-6xl">▶️</div>
+            <p className="text-slate-400">您上传的视频</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -116,12 +139,12 @@ function UploadIdle({ onUpload }: { onUpload: () => void }) {
 // 上传进度
 function UploadingProgress() {
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-4">
-      <div className="text-lg font-medium">上传中...</div>
-      <div className="w-full max-w-md h-2 bg-white/10 rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-[#0066FF] to-[#60A5FA] w-2/3 transition-all" />
+    <div className="space-y-4">
+      <h3 className="text-2xl font-bold">上传中...</h3>
+      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-[#0066FF] to-[#60A5FA] w-2/3 transition-all duration-300" />
       </div>
-      <p className="text-sm text-slate-400">66%</p>
+      <p className="text-sm text-slate-400">66% · 正在上传视频文件</p>
     </div>
   )
 }
@@ -129,39 +152,51 @@ function UploadingProgress() {
 // 解析进度
 function ParsingProgress() {
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-6">
-      <div className="w-20 h-20 rounded-full border-4 border-[#0066FF] border-t-transparent animate-spin" />
-      <div className="text-lg font-medium">视频解析中...</div>
-      <p className="text-sm text-slate-400">正在识别语音和台词</p>
+    <div className="space-y-6">
+      <h3 className="text-2xl font-bold">视频解析中...</h3>
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full border-4 border-[#0066FF] border-t-transparent animate-spin" />
+        <div className="flex-1">
+          <p className="text-slate-400">正在识别语音和台词</p>
+          <p className="text-sm text-slate-500 mt-1">预计需要 30 秒</p>
+        </div>
+      </div>
     </div>
   )
 }
 
 // 台词编辑模块
-function EditingModule() {
+function EditingModule({ onGenerate }: { onGenerate: () => void }) {
   return (
-    <div className="h-full flex flex-col space-y-4">
-      <h3 className="text-xl font-bold">编辑台词</h3>
+    <div className="space-y-6">
+      <h3 className="text-2xl font-bold">编辑台词</h3>
 
       {/* 语言选择 */}
       <div className="flex items-center gap-3">
-        <span className="text-sm text-slate-400">目标语言:</span>
-        <select className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg">
+        <span className="text-sm text-slate-400 min-w-[80px]">目标语言:</span>
+        <select className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white">
           <option>英语 (EN)</option>
           <option>日语 (JA)</option>
           <option>韩语 (KO)</option>
+          <option>俄语 (RU)</option>
+          <option>西班牙语 (ES)</option>
+          <option>阿拉伯语 (AR)</option>
+          <option>粤语 (YUE)</option>
         </select>
       </div>
 
       {/* 台词列表 */}
-      <div className="flex-1 overflow-y-auto space-y-3">
+      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
         {[1, 2, 3].map(i => (
-          <div key={i} className="p-4 bg-white/5 rounded-lg">
-            <div className="text-xs text-slate-400 mb-2">讲话人 {i} · 00:00:0{i} - 00:00:0{i+2}</div>
+          <div key={i} className="p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-slate-400">讲话人 {i}</span>
+              <span className="text-xs text-slate-500">00:00:0{i} - 00:00:0{i+2}</span>
+            </div>
             <textarea
-              className="w-full bg-transparent border border-white/10 rounded p-2 text-sm resize-none"
+              className="w-full bg-transparent border-0 text-sm resize-none focus:outline-none"
               rows={2}
-              defaultValue="这是一段示例台词..."
+              defaultValue="这是一段示例台词，可以直接编辑修改..."
             />
           </div>
         ))}
@@ -169,8 +204,14 @@ function EditingModule() {
 
       {/* 底部操作 */}
       <div className="pt-4 border-t border-white/10 space-y-3">
-        <div className="text-sm text-slate-400">预计消耗: 50 算力</div>
-        <button className="w-full py-3 bg-gradient-to-r from-[#0066FF] to-[#60A5FA] rounded-xl font-medium">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-400">预计消耗算力</span>
+          <span className="text-[#0066FF] font-mono font-medium">50</span>
+        </div>
+        <button
+          onClick={onGenerate}
+          className="w-full py-3 bg-gradient-to-r from-[#0066FF] to-[#60A5FA] rounded-xl font-medium hover:opacity-90 transition-opacity"
+        >
           生成视频
         </button>
       </div>
@@ -181,12 +222,15 @@ function EditingModule() {
 // 生成提交模块
 function GeneratingModule({ onReset }: { onReset: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-6">
-      <div className="text-xl font-medium">✓ 任务已提交</div>
-      <p className="text-slate-400">可在「我的」Tab 查看进度</p>
+    <div className="space-y-6">
+      <div className="text-center space-y-4 py-8">
+        <div className="text-6xl">✓</div>
+        <h3 className="text-2xl font-bold">任务已提交</h3>
+        <p className="text-slate-400">视频正在生成中，可在「我的」Tab 查看进度</p>
+      </div>
       <button
         onClick={onReset}
-        className="px-6 py-3 bg-[#0066FF] rounded-xl font-medium hover:opacity-90"
+        className="w-full py-3 bg-[#0066FF] rounded-xl font-medium hover:opacity-90 transition-opacity"
       >
         新建任务
       </button>
