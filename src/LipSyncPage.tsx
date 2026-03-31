@@ -1,32 +1,61 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // 状态机类型定义
 type LipSyncStage = 'idle' | 'uploading' | 'parsing' | 'editing' | 'generating'
 
 export default function LipSyncPage() {
   const [stage, setStage] = useState<LipSyncStage>('idle')
+  const [showDebug, setShowDebug] = useState(false)
+
+  // 自动状态流转
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+
+    if (stage === 'uploading') {
+      // 模拟上传 2 秒后自动进入解析
+      timer = setTimeout(() => setStage('parsing'), 2000)
+    } else if (stage === 'parsing') {
+      // 模拟解析 3 秒后自动进入编辑
+      timer = setTimeout(() => setStage('editing'), 3000)
+    }
+
+    return () => clearTimeout(timer)
+  }, [stage])
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white">
-      {/* 开发用：状态切换器 */}
-      <div className="fixed bottom-4 right-4 z-50 bg-[#141414] border border-white/20 rounded-xl p-4 shadow-2xl">
-        <div className="text-xs text-slate-400 mb-2">开发调试 - 状态切换</div>
-        <div className="flex gap-2">
-          {(['idle', 'uploading', 'parsing', 'editing', 'generating'] as LipSyncStage[]).map(s => (
-            <button
-              key={s}
-              onClick={() => setStage(s)}
-              className={`px-3 py-1 text-xs rounded ${
-                stage === s
-                  ? 'bg-[#0066FF] text-white'
-                  : 'bg-white/5 text-slate-400 hover:bg-white/10'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+      {/* 开发用：状态切换器（按 D 键显示/隐藏） */}
+      {showDebug && (
+        <div className="fixed bottom-4 right-4 z-50 bg-[#141414] border border-white/20 rounded-xl p-4 shadow-2xl">
+          <div className="text-xs text-slate-400 mb-2">开发调试 - 状态切换</div>
+          <div className="flex gap-2">
+            {(['idle', 'uploading', 'parsing', 'editing', 'generating'] as LipSyncStage[]).map(s => (
+              <button
+                key={s}
+                onClick={() => setStage(s)}
+                className={`px-3 py-1 text-xs rounded ${
+                  stage === s
+                    ? 'bg-[#0066FF] text-white'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* 监听键盘事件显示调试器 */}
+      <div
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'd' || e.key === 'D') {
+            setShowDebug(!showDebug)
+          }
+        }}
+        className="outline-none"
+      >
 
       {/* Header 导航栏 */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#141414] border-b border-white/8">
@@ -86,7 +115,7 @@ function LeftSection({ stage, setStage }: {
     <div className="space-y-6">
       {stage === 'uploading' && <UploadingProgress />}
       {stage === 'parsing' && <ParsingProgress />}
-      {stage === 'editing' && <EditingModule onGenerate={() => setStage('generating')} />}
+      {stage === 'editing' && <EditingModule onGenerate={() => setStage('generating')} onBack={() => setStage('idle')} />}
       {stage === 'generating' && <GeneratingModule onReset={() => setStage('idle')} />}
     </div>
   )
@@ -186,10 +215,18 @@ function ParsingProgress() {
 }
 
 // 台词编辑模块
-function EditingModule({ onGenerate }: { onGenerate: () => void }) {
+function EditingModule({ onGenerate, onBack }: { onGenerate: () => void; onBack: () => void }) {
   return (
     <div className="space-y-6">
-      <h3 className="text-2xl font-bold">编辑台词</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-2xl font-bold">编辑台词</h3>
+        <button
+          onClick={onBack}
+          className="text-sm text-slate-400 hover:text-white transition-colors"
+        >
+          ← 返回重新上传
+        </button>
+      </div>
 
       {/* 语言选择 */}
       <div className="flex items-center gap-3">
