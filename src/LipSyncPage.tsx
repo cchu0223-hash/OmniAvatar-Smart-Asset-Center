@@ -1,4 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useTheme } from './useTheme'
+import { lipsyncTargetLanguageList as LANGS } from './lipsyncLanguages'
+
+import type { Theme } from './useTheme'
 
 type LipSyncStage = 'idle' | 'uploading' | 'parsing' | 'editing'
 type ActiveTab = 'more' | 'mine'
@@ -23,12 +28,43 @@ const CARDS = [
   { img: '/vcard-6.png', lang: 'ES', cat: '短剧', title: '漫威经典对白西班牙语重制版' },
 ]
 
-const LANGS = ['中文 · ZH', '英语 · EN', '日语 · JA', '韩语 · KO', '俄语 · RU', '阿拉伯语 · AR', '西班牙语 · ES', '粤语 · YUE']
-
 const SEGMENTS = [
   { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: 'Sometimes you have to let go of the picture you had in mind, and see the beauty in the story you\'re living.', hl: 'Sometimes' },
   { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: 'You know, every great story begins with a single brave decision. That\'s what brought us here today.', hl: 'every great story' },
 ]
+
+/** 落地页 Mock：切换目标语言后「翻译」结果（结构对齐 SEGMENTS，正式环境走翻译 API） */
+const SEGMENTS_FOR_LANG: Record<string, typeof SEGMENTS> = {
+  '中文 · ZH': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: '有时你必须放下心中预设的那幅画，才能看见你所经历的故事里藏着的美。', hl: '有时' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: '要知道，每个伟大的故事都始于一次勇敢的决定。正是它把我们带到了今天。', hl: '每个伟大' },
+  ],
+  '英语 · EN': SEGMENTS,
+  '日语 · JA': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: 'ときには、頭に描いていた絵を手放して、目の前の物語の美しさに気づく必要があります。', hl: 'ときには' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: 'すごい物語は、たった一つの勇気ある決断から始まる。今日ここにいるのもそのおかげだ。', hl: 'すごい物語' },
+  ],
+  '韩语 · KO': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: '때로는 머릿속에 그려 둔 그림을 내려놓아야 살아가는 이야기의 아름다움을 볼 수 있어요.', hl: '때로는' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: '위대한 이야기는 모두 단 하나의 용기 있는 선택에서 시작돼요. 오늘 우리가 여기 있는 것도 그래서예요.', hl: '위대한' },
+  ],
+  '俄语 · RU': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: 'Иногда нужно отпустить картину, которую вы держали в голове, и увидеть красоту истории, в которой вы живёте.', hl: 'Иногда' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: 'Знаете, великая история начинается с одного смелого решения. Именно оно привело нас сюда сегодня.', hl: 'великая история' },
+  ],
+  '阿拉伯语 · AR': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: 'أحيانًا عليك أن تترك الصورة التي رسمتها في ذهنك لترى جمال القصة التي تعيشها.', hl: 'أحيانًا' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: 'كل قصة عظيمة تبدأ بقرار شجاع واحد. هذا ما جاء بنا إلى هنا اليوم.', hl: 'قصة' },
+  ],
+  '西班牙语 · ES': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: 'A veces tienes que soltar la imagen que tenías en mente y ver la belleza de la historia que estás viviendo.', hl: 'A veces' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: 'Toda gran historia empieza con una sola decisión valiente. Eso es lo que nos trajo hasta hoy.', hl: 'gran historia' },
+  ],
+  '粤语 · YUE': [
+    { id: 1, speaker: 'Speaker 1', range: '00:00—00:12', text: '有時你要放低个脑入面幅相先至睇到你经历紧个故事有几靓。', hl: '有時' },
+    { id: 2, speaker: 'Speaker 2', range: '00:15—00:45', text: '每个劲故事都系由一个勇敢决定开始嘅，我哋今日坐喺度都系咁样。', hl: '劲故事' },
+  ],
+}
 
 const MINE_MOCK: LipSyncTask[] = [
   { id: 'm1', name: '黑色星期四.avi', status: 'processing', progress: 42, targetLanguage: '英文', duration: '1m14s', createdAt: Date.now() - 60000 * 5 },
@@ -38,6 +74,8 @@ const MINE_MOCK: LipSyncTask[] = [
 ]
 
 export default function LipSyncPage() {
+  const navigate = useNavigate()
+  const { theme, toggle: toggleTheme } = useTheme()
   const [stage, setStage] = useState<LipSyncStage>('idle')
   const [activeTab, setActiveTab] = useState<ActiveTab>('more')
   const [tasks, setTasks] = useState<LipSyncTask[]>(MINE_MOCK)
@@ -48,6 +86,8 @@ export default function LipSyncPage() {
   // typewriter: how many chars of each segment text are revealed
   const [twRevealed, setTwRevealed] = useState<number[]>([])
   const [selectedLang, setSelectedLang] = useState('英语 · EN')
+  const [langTranslating, setLangTranslating] = useState(false)
+  const langTransTimerRef = useRef<number | null>(null)
   const [segments, setSegments] = useState(SEGMENTS)
   const [segHistory, setSegHistory] = useState<typeof SEGMENTS[]>([SEGMENTS])
   const [segHistIdx, setSegHistIdx] = useState(0)
@@ -56,6 +96,34 @@ export default function LipSyncPage() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploadedFileName, setUploadedFileName] = useState('上传视频.mp4')
   const [durationWarning, setDurationWarning] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasExceededLimit, setHasExceededLimit] = useState(false)
+  const [warningMessage, setWarningMessage] = useState('')
+
+  // ── 阈值配置 ──
+  const MAX_SEGMENT_LENGTH = 200
+  const MAX_TOTAL_LENGTH = 2000
+
+  // ── 检测字数限制 ──
+  const checkLimits = (segs: typeof SEGMENTS) => {
+    const totalLength = segs.reduce((sum, s) => sum + s.text.length, 0)
+    const longSegment = segs.find(s => s.text.length > MAX_SEGMENT_LENGTH)
+
+    if (totalLength > MAX_TOTAL_LENGTH) {
+      setHasExceededLimit(true)
+      setWarningMessage(`总字数 ${totalLength} 超出限制 ${MAX_TOTAL_LENGTH}，请精简内容`)
+      return false
+    }
+    if (longSegment) {
+      setHasExceededLimit(true)
+      setWarningMessage('')
+      return false
+    }
+
+    setHasExceededLimit(false)
+    setWarningMessage('')
+    return true
+  }
 
   // ── uploading: progress bar ──
   useEffect(() => {
@@ -130,6 +198,10 @@ export default function LipSyncPage() {
     return () => clearInterval(iv)
   }, [])
 
+  useEffect(() => () => {
+    if (langTransTimerRef.current != null) window.clearTimeout(langTransTimerRef.current)
+  }, [])
+
   const handleUpload = (name?: string) => {
     const fname = name || '上传视频.mp4'
     // mock: .avi or filenames > 5min duration trigger warning
@@ -163,7 +235,13 @@ export default function LipSyncPage() {
 
   // resume draft
   const handleResumeDraft = (task: LipSyncTask) => {
-    if (task.savedSegments) setSegments(task.savedSegments)
+    if (langTransTimerRef.current != null) { window.clearTimeout(langTransTimerRef.current); langTransTimerRef.current = null }
+    setLangTranslating(false)
+    if (task.savedSegments) {
+      setSegments(task.savedSegments)
+      setSegHistory([task.savedSegments])
+      setSegHistIdx(0)
+    }
     setUploadedFileName(task.name)
     setStage('editing')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -172,10 +250,36 @@ export default function LipSyncPage() {
   const handleSegmentEdit = (id: number, text: string) => {
     setSegments(prev => {
       const next = prev.map(s => s.id === id ? { ...s, text } : s)
+      checkLimits(next)
       setSegHistory(h => { const nh = h.slice(0, segHistIdx + 1); nh.push(next); return nh })
       setSegHistIdx(i => i + 1)
       return next
     })
+  }
+
+  /** 切换目标语言：展示翻译中 → Mock 覆盖台词；写入历史栈，可点撤回撤销本次翻译 */
+  const handleSelectLang = (l: string) => {
+    if (l === selectedLang || langTranslating) return
+    if (langTransTimerRef.current != null) window.clearTimeout(langTransTimerRef.current)
+    setEditingId(null)
+    setSelectedLang(l)
+    setLangTranslating(true)
+    langTransTimerRef.current = window.setTimeout(() => {
+      langTransTimerRef.current = null
+      setSegments(prev => {
+        const next = SEGMENTS_FOR_LANG[l] ?? prev
+        setSegHistIdx(idx => {
+          setSegHistory(h => {
+            const nh = h.slice(0, idx + 1)
+            nh.push(next)
+            return nh
+          })
+          return idx + 1
+        })
+        return next
+      })
+      setLangTranslating(false)
+    }, 1400)
   }
   const handleSegUndo = () => {
     if (segHistIdx <= 0) return
@@ -190,6 +294,11 @@ export default function LipSyncPage() {
   const handleZtkFromCard = (card: typeof CARDS[0]) => {
     setUploadedFileName(card.title + '.mp4')
     setSegments(SEGMENTS)
+    setSegHistory([SEGMENTS])
+    setSegHistIdx(0)
+    setSelectedLang('英语 · EN')
+    setLangTranslating(false)
+    if (langTransTimerRef.current != null) { window.clearTimeout(langTransTimerRef.current); langTransTimerRef.current = null }
     setStage('editing')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -202,21 +311,25 @@ export default function LipSyncPage() {
   return (
     <div
       className="min-h-screen text-white"
-      style={{ fontFamily: "'PingFang SC','Microsoft YaHei','Helvetica Neue',sans-serif", backgroundColor: '#030a1a', backgroundImage: 'url(/hero-banner-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center top', backgroundAttachment: 'fixed' }}
+      style={{ fontFamily: "'PingFang SC','Microsoft YaHei','Helvetica Neue',sans-serif", backgroundColor: 'var(--bg-page)', backgroundImage: 'url(/hero-banner-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center -160px', backgroundAttachment: 'fixed' }}
     >
-      <div className="fixed inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(3,10,26,0.55) 0%,rgba(3,10,26,0.85) 60%,#030a1a 100%)', zIndex: 0 }} />
+      <div className="fixed inset-0 pointer-events-none lipsync-overlay" style={{ zIndex: 0 }} />
 
       <div className="relative" style={{ zIndex: 1 }}>
 
         {/* Header */}
-        <header className="flex items-center justify-between px-8 h-14 sticky top-0" style={{ background: 'rgba(3,10,26,0.72)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(17,45,70,0.8)', zIndex: 50 }}>
-          <button onClick={() => setStage('idle')} className="flex items-center gap-2 cursor-pointer" style={{ transition: 'filter 0.2s' }} onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.18)')} onMouseLeave={e => (e.currentTarget.style.filter = 'none')}>
-            <img src="/title-logo.gif" alt="讯飞智作" style={{ height: '28px' }} />
-            <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 600, fontSize: '15px', background: 'linear-gradient(90deg,#00f2ff,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>讯飞智作</span>
+        <header className="flex items-center justify-between px-8 h-14 sticky top-0" style={{ background: 'var(--bg-header)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-header)', zIndex: 50 }}>
+          <button type="button" title="返回首页" onClick={() => navigate('/')} className="flex items-center gap-2 cursor-pointer" style={{ transition: 'filter 0.2s' }} onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.18)')} onMouseLeave={e => (e.currentTarget.style.filter = 'none')}>
+            <img src={theme === 'light' ? '/logo-light.png' : '/title-logo.gif'} alt="" style={{ height: '28px' }} />
+            <span className="lipsync-header-home-link" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 600, fontSize: '15px', color: 'var(--text-bright)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>返回首页</span>
           </button>
           <div className="flex items-center gap-3">
-            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>算力: <span style={{ color: '#7fd6ff', fontWeight: 600 }}>48,510</span></div>
-            <button style={{ height: '36px', padding: '0 16px', borderRadius: '8px', color: 'rgba(2,241,255,1)', border: '1px solid rgba(2,241,255,1)', background: 'rgba(2,241,255,0.08)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(24,144,255,0.5)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>登录 / 注册</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', backdropFilter: 'blur(12px)', cursor: 'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#a78bfa', fontVariationSettings: '"FILL" 1' }}>bolt</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>算力: <span style={{ color: '#7fd6ff', fontWeight: 700 }}>48,510</span></span>
+            </div>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <button className="lipsync-login-btn" style={{ height: '36px', padding: '0 16px', borderRadius: '8px', color: 'rgba(2,241,255,1)', border: '1px solid rgba(2,241,255,1)', background: 'rgba(2,241,255,0.08)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(24,144,255,0.5)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>登录 / 注册</button>
           </div>
         </header>
 
@@ -230,7 +343,7 @@ export default function LipSyncPage() {
                   <img src="/title-logo.gif" alt="" style={{ width: '62px', height: '62px', flexShrink: 0 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <TypewriterTitle />
-                    <p style={{ fontSize: '18px', fontWeight: 400, color: 'rgba(112,207,255,0.65)', margin: 0 }}>分钟级生成，多语种真实对口型视频</p>
+                    <p className="lipsync-subtitle" style={{ fontSize: '18px', fontWeight: 400, color: 'rgba(112,207,255,0.65)', margin: 0 }}>多语种真实 AI对口型视频，让您的视频全球发声。</p>
                   </div>
                 </div>
                 <UploadCard isDragOver={isDragOver} onDragOver={() => setIsDragOver(true)} onDragLeave={() => setIsDragOver(false)} onDrop={() => { setIsDragOver(false); handleUpload() }} onUpload={handleUpload} />
@@ -238,15 +351,15 @@ export default function LipSyncPage() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fbbf24', flexShrink: 0, marginTop: '1px' }}>warning</span>
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '13px', color: 'rgba(251,191,36,0.9)', lineHeight: 1.5 }}>视频时长超过 5min，建议前往<button onClick={() => {}} style={{ background: 'none', border: 'none', color: '#00f2ff', fontSize: '13px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>专业剪辑</button>分段进行对口型</p>
+                      <p style={{ margin: 0, fontSize: '13px', color: 'rgba(251,191,36,0.9)', lineHeight: 1.5 }}>视频时长超过 5min，建议前往<button type="button" onClick={() => navigate('/professional-edit')} style={{ background: 'none', border: 'none', color: '#00f2ff', fontSize: '13px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>专业剪辑</button>分段进行 AI对口型</p>
                     </div>
-                    <button onClick={() => setDurationWarning(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                    <button onClick={() => setDurationWarning(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
                     </button>
                   </div>
                 )}
               </div>
-              <DemoVideoCard onZtk={() => handleZtkFromCard(CARDS[3])} />
+              <DemoVideoCard />
             </div>
 
             {/* EDITOR pane */}
@@ -258,7 +371,8 @@ export default function LipSyncPage() {
                 parseProgress={parseProgress}
                 twRevealed={twRevealed}
                 selectedLang={selectedLang}
-                onLangChange={setSelectedLang}
+                langTranslating={langTranslating}
+                onLangChange={handleSelectLang}
                 segments={segments}
                 editingId={editingId}
                 editText={editText}
@@ -266,6 +380,11 @@ export default function LipSyncPage() {
                 onEditChange={setEditText}
                 onEditSave={(id) => { handleSegmentEdit(id, editText); setEditingId(null) }}
                 onEditCancel={() => setEditingId(null)}
+                isSaving={isSaving}
+                onSavingChange={setIsSaving}
+                hasExceededLimit={hasExceededLimit}
+                warningMessage={warningMessage}
+                maxSegmentChars={MAX_SEGMENT_LENGTH}
                 onCancelParsing={handleCancelParsing}
                 onBgParsing={handleBgParsing}
                 onCancelEdit={handleCancelEdit}
@@ -275,6 +394,7 @@ export default function LipSyncPage() {
                 onRedo={handleSegRedo}
                 canUndo={segHistIdx > 0}
                 canRedo={segHistIdx < segHistory.length - 1}
+                onNavigateProEdit={() => navigate('/professional-edit')}
               />
             )}
           </section>
@@ -285,9 +405,9 @@ export default function LipSyncPage() {
               <div style={{ display: 'flex', marginBottom: '24px' }}>
                 <div style={{ display: 'inline-flex', gap: '48px' }}>
                   {(['more', 'mine'] as ActiveTab[]).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} style={{ background: 'none', border: 'none', fontSize: '15px', fontWeight: 500, color: activeTab === tab ? '#ffffff' : 'rgba(255,255,255,0.5)', padding: '0 0 12px', cursor: 'pointer', position: 'relative', transition: 'color 0.2s' }}>
+                    <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'tab-btn-active' : 'tab-btn-inactive'} style={{ background: 'none', border: 'none', fontSize: '15px', fontWeight: 500, color: activeTab === tab ? '#ffffff' : 'rgba(255,255,255,0.5)', padding: '0 0 12px', cursor: 'pointer', position: 'relative', transition: 'color 0.2s' }}>
                       {tab === 'more' ? '更多实例' : '我的合成'}
-                      {activeTab === tab && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', borderRadius: '2px', background: 'linear-gradient(90deg,#00f2ff,#0066ff)' }} />}
+                      {activeTab === tab && <span className="tab-indicator" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', borderRadius: '2px', background: 'linear-gradient(90deg,#00f2ff,#0066ff)' }} />}
                     </button>
                   ))}
                 </div>
@@ -303,7 +423,7 @@ export default function LipSyncPage() {
 
               {activeTab === 'mine' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {tasks.length === 0 && <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>暂无合成记录</div>}
+                  {tasks.length === 0 && <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: '14px' }}>暂无合成记录</div>}
                   {tasks.map(task => (
                     <MineCard key={task.id} task={task} fmtTime={fmtTime} onDelete={id => setTasks(prev => prev.filter(t => t.id !== id))} onResume={handleResumeDraft} />
                   ))}
@@ -325,7 +445,7 @@ function TypewriterTitle() {
   const [t1, setT1] = useState('')
   const [t2, setT2] = useState('')
   const [phase, setPhase] = useState<'p1' | 'p2' | 'done'>('p1')
-  const P1 = '讯飞智作'; const P2 = '，视频对口型一步到位'
+  const P1 = '讯飞智作'; const P2 = '，AI对口型一步到位'
   useEffect(() => {
     let i = 0
     if (phase === 'p1') {
@@ -338,8 +458,8 @@ function TypewriterTitle() {
     }
   }, [phase])
   return (
-    <h1 style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 'clamp(22px,2.6vw,38px)', fontWeight: 600, lineHeight: 1.15, letterSpacing: '-0.35px', margin: 0 }}>
-      <span style={{ background: 'linear-gradient(180deg,#fff,#cbd5e0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t1}</span>
+    <h1 className="lipsync-hero-title" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 'clamp(20px,2.4vw,34px)', fontWeight: 600, lineHeight: 1.15, letterSpacing: '-0.35px', margin: 0, whiteSpace: 'nowrap' }}>
+      <span className="title-t1" style={{ background: 'linear-gradient(180deg,#fff,#cbd5e0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t1}</span>
       <span style={{ background: 'linear-gradient(90deg,#00f2ff,#3b82f6,#8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t2}</span>
       {phase !== 'done' && <span style={{ display: 'inline-block', width: '3px', height: '1em', background: '#00f2ff', marginLeft: '2px', verticalAlign: 'middle', animation: 'blink 1s step-end infinite' }} />}
       <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
@@ -351,17 +471,18 @@ function TypewriterTitle() {
 function UploadCard({ isDragOver, onDragOver, onDragLeave, onDrop, onUpload }: { isDragOver: boolean; onDragOver: () => void; onDragLeave: () => void; onDrop: () => void; onUpload: () => void }) {
   return (
     <div onDragOver={e => { e.preventDefault(); onDragOver() }} onDragLeave={onDragLeave} onDrop={e => { e.preventDefault(); onDrop() }}
-      style={{ width: '100%', maxWidth: '602px', height: '258px', background: 'rgba(24,34,52,0.42)', backdropFilter: 'blur(22px) saturate(1.2)', border: `1px solid ${isDragOver ? 'rgba(24,144,255,0.65)' : 'rgba(120,190,255,0.22)'}`, borderRadius: '18px', display: 'flex', flexDirection: 'column', transition: 'border-color 0.2s,box-shadow 0.2s', boxShadow: isDragOver ? '0 0 0 3px rgba(24,144,255,0.18),0 20px 60px rgba(0,0,0,0.4)' : '0 8px 40px rgba(0,0,0,0.3)', cursor: 'pointer', overflow: 'hidden' }}
+      className="upload-card"
+      style={{ width: '100%', maxWidth: '602px', height: '258px', background: 'var(--bg-card)', backdropFilter: 'blur(22px) saturate(1.2)', border: `1px solid ${isDragOver ? 'rgba(24,144,255,0.65)' : 'var(--border-card)'}`, borderRadius: '18px', display: 'flex', flexDirection: 'column', transition: 'border-color 0.2s,box-shadow 0.2s', boxShadow: isDragOver ? '0 0 0 3px rgba(24,144,255,0.18),0 20px 60px rgba(0,0,0,0.4)' : 'var(--shadow-card)', cursor: 'pointer', overflow: 'hidden' }}
       onClick={onUpload}
-      onMouseEnter={e => { if (!isDragOver) { e.currentTarget.style.borderColor = 'rgba(24,144,255,0.42)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(24,144,255,0.12),0 20px 60px rgba(0,0,0,0.4)' } }}
-      onMouseLeave={e => { if (!isDragOver) { e.currentTarget.style.borderColor = 'rgba(120,190,255,0.22)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.3)' } }}
+      onMouseEnter={e => { if (!isDragOver) { e.currentTarget.style.borderColor = 'var(--border-card-hover)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(24,144,255,0.12),0 20px 60px rgba(0,0,0,0.4)' } }}
+      onMouseLeave={e => { if (!isDragOver) { e.currentTarget.style.borderColor = 'var(--border-card)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)' } }}
     >
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '24px' }}>
         <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.15))', border: '1px solid rgba(0,242,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#00f2ff' }}>upload_file</span>
         </div>
-        <p style={{ fontSize: '15px', fontWeight: 500, color: 'rgba(255,255,255,0.85)', margin: 0 }}>点击上传视频</p>
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>支持 mp4、mov 格式，时长不超过 5min</p>
+        <p className="upload-main-text" style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-bright)', margin: 0 }}>点击上传视频</p>
+        <p className="upload-formats" style={{ fontSize: '12px', color: 'var(--text-dim)', margin: 0 }}>支持 mp4、mov 格式，时长不超过 5min</p>
       </div>
       <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px' }}>
         <button onClick={e => { e.stopPropagation(); onUpload() }} style={{ flex: 1, height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.12))', border: '1px solid rgba(0,242,255,0.3)', color: '#00f2ff', fontSize: '14px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,242,255,0.2)'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.12))'; e.currentTarget.style.transform = 'none' }}>上传视频</button>
@@ -371,24 +492,23 @@ function UploadCard({ isDragOver, onDragOver, onDragLeave, onDrop, onUpload }: {
 }
 
 // ── DemoVideoCard ──
-function DemoVideoCard({ onZtk }: { onZtk: () => void }) {
+function DemoVideoCard() {
   const [muted, setMuted] = useState(true)
   const [playing, setPlaying] = useState(false)
   return (
     <div style={{ position: 'relative', width: '100%', aspectRatio: '658/461', borderRadius: '18px', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.3s,box-shadow 0.3s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 24px 60px rgba(0,0,0,.55)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>
       <img src="/vcard-4.png" alt="AI 对口型示例" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 30%,rgba(0,0,0,0.58) 100%)' }} />
-      <p style={{ position: 'absolute', top: '16px', left: '16px', margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>歌剧魅影男主唱海绵宝宝</p>
+      <p style={{ position: 'absolute', top: '16px', left: '16px', margin: 0, fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.96)', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>歌剧魅影男主唱海绵宝宝</p>
       <div style={{ position: 'absolute', top: '14px', right: '16px' }}>
-        <button onClick={() => setMuted(v => !v)} style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+        <button onClick={() => setMuted(v => !v)} style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.95)' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{muted ? 'volume_off' : 'volume_up'}</span>
         </button>
       </div>
-      <div style={{ position: 'absolute', bottom: '16px', left: '24px', right: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button onClick={() => setPlaying(v => !v)} style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+      <div style={{ position: 'absolute', bottom: '16px', left: '24px', right: '20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+        <button onClick={() => setPlaying(v => !v)} style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.95)' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{playing ? 'pause' : 'play_arrow'}</span>
         </button>
-        <ZtkButton onClick={onZtk} />
       </div>
     </div>
   )
@@ -418,20 +538,39 @@ function fmtSec(s: number) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
 }
 
+/** 时间轴分段：段落按时长比例占宽，中间空白时段为间隔条 */
+function buildTimelinePieces(segs: typeof SEGMENTS, totalDur: number): Array<{ kind: 'gap'; dur: number } | { kind: 'seg'; seg: typeof SEGMENTS[0] }> {
+  const sorted = [...segs].sort((a, b) => parseRange(a.range).start - parseRange(b.range).start)
+  const pieces: Array<{ kind: 'gap'; dur: number } | { kind: 'seg'; seg: typeof SEGMENTS[0] }> = []
+  let t = 0
+  for (const seg of sorted) {
+    const { start, end } = parseRange(seg.range)
+    if (start > t) pieces.push({ kind: 'gap', dur: start - t })
+    pieces.push({ kind: 'seg', seg })
+    t = Math.max(t, end)
+  }
+  if (t < totalDur) pieces.push({ kind: 'gap', dur: totalDur - t })
+  return pieces
+}
+
 // ── EditorPane ──
-function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed, selectedLang, onLangChange, segments, editingId, editText, onEditStart, onEditChange, onEditSave, onEditCancel, onCancelParsing, onBgParsing, onCancelEdit, onSaveDraft, onGenerateVideo, onUndo, onRedo, canUndo, canRedo }: {
+function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed, selectedLang, langTranslating, onLangChange, segments, editingId, editText, onEditStart, onEditChange, onEditSave, onEditCancel, isSaving, onSavingChange, hasExceededLimit, warningMessage, maxSegmentChars, onCancelParsing, onBgParsing, onCancelEdit, onSaveDraft, onGenerateVideo, onUndo, onRedo, canUndo, canRedo, onNavigateProEdit }: {
   stage: LipSyncStage; fileName: string; uploadProgress: number; parseProgress: number; twRevealed: number[]
-  selectedLang: string; onLangChange: (l: string) => void; segments: typeof SEGMENTS
+  selectedLang: string; langTranslating: boolean; onLangChange: (l: string) => void; segments: typeof SEGMENTS
   editingId: number | null; editText: string
   onEditStart: (id: number, text: string) => void; onEditChange: (t: string) => void
   onEditSave: (id: number) => void; onEditCancel: () => void
+  isSaving: boolean; onSavingChange: (v: boolean) => void
+  hasExceededLimit: boolean; warningMessage: string; maxSegmentChars: number
   onCancelParsing: () => void; onBgParsing: () => void
   onCancelEdit: () => void; onSaveDraft: () => void; onGenerateVideo: () => void
   onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean
+  onNavigateProEdit: () => void
 }) {
   const [showLangDrop, setShowLangDrop] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [aiWatermark, setAiWatermark] = useState(true)
   const timelineRef = useRef<HTMLDivElement>(null)
 
   // playback simulation
@@ -477,10 +616,20 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [dragging])
 
-  const handleSegPlay = (segId: number) => {
+  /** 段落「播放 / 暂停」：正在播本段则暂停；已暂停且指针在本段则续播；否则跳到段首并播放 */
+  const handleSegPlayToggle = (segId: number) => {
     const seg = segments.find(s => s.id === segId)
     if (!seg) return
-    const { start } = parseRange(seg.range)
+    const { start, end } = parseRange(seg.range)
+    const playheadInThisSeg = currentTime >= start && currentTime <= end
+    if (isPlaying && activeSegId === segId) {
+      setIsPlaying(false)
+      return
+    }
+    if (!isPlaying && playheadInThisSeg) {
+      setIsPlaying(true)
+      return
+    }
     setCurrentTime(start)
     setIsPlaying(true)
   }
@@ -492,15 +641,28 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
   const progressPct = (currentTime / TOTAL_DUR) * 100
 
   return (
-    <div style={{ border: '1px solid #2f3d52', borderRadius: '16px', background: '#001529', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', overflow: 'hidden' }}>
+    <div className="hero-editor" style={{ border: '1px solid var(--border-main)', borderRadius: '16px', background: 'var(--bg-editor)', boxShadow: 'var(--shadow-panel)', overflow: 'hidden' }}>
       {/* Top bar */}
-      <div style={{ minHeight: '46px', padding: '0 16px', borderBottom: '1px solid #2f3d52', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+      <div className="hero-editor-top" style={{ minHeight: '46px', padding: '0 16px', borderBottom: '1px solid var(--border-main)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
           {(stage === 'uploading' || stage === 'parsing') && (
             <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #00f2ff', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
           )}
-          <span style={{ fontSize: '15px', fontWeight: 500, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topLabel}</span>
+          <span className="hero-editor-filename" style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topLabel}</span>
         </div>
+        {/* AI Watermark toggle — only in editing stage */}
+        {stage === 'editing' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>AI 水印</span>
+            <button
+              onClick={() => setAiWatermark(v => !v)}
+              style={{ position: 'relative', width: '36px', height: '20px', borderRadius: '10px', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: aiWatermark ? 'linear-gradient(90deg,#00c2ff,#5752ff)' : 'rgba(255,255,255,0.15)', padding: 0 }}
+              title={aiWatermark ? '关闭 AI 水印' : '开启 AI 水印'}
+            >
+              <span style={{ position: 'absolute', top: '2px', left: aiWatermark ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', background: '#ffffff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           {stage === 'editing' && (
             <span style={{ fontSize: '13px', background: 'linear-gradient(90deg,#00f2ff,#41bcc3,#6b8cff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>预计消耗 <b>125</b> 算力</span>
@@ -515,17 +677,17 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
             <>
               <EdBtn onClick={onCancelEdit}>取消合成</EdBtn>
               <EdBtn onClick={onSaveDraft}>保存草稿</EdBtn>
-              <EdBtn primary onClick={onGenerateVideo}>合成视频</EdBtn>
+              <EdBtn primary onClick={onGenerateVideo} disabled={hasExceededLimit || isSaving || editingId !== null}>合成视频</EdBtn>
             </>
           )}
         </div>
       </div>
 
       {/* Body */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) minmax(260px,1fr)', minHeight: 'min(506px,58vh)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) minmax(260px,1fr)', minHeight: 'min(506px,58vh)', alignItems: 'stretch' }}>
         {/* Left */}
-        <div style={{ background: '#141b26', padding: '16px 12px 12px', display: 'flex', flexDirection: 'column', gap: '12px', borderRight: '1px solid #2f3d52' }}>
-          <div style={{ flex: '1 1 0', minHeight: '168px', maxHeight: '70%', borderRadius: '6px', overflow: 'hidden', background: '#0a0f1a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <div className="hero-ed-left" style={{ minHeight: 0, background: 'var(--bg-panel)', padding: '16px 12px 12px', display: 'flex', flexDirection: 'column', gap: '12px', borderRight: '1px solid var(--border-main)' }}>
+          <div style={{ flex: '1 1 0', minHeight: '168px', maxHeight: '70%', borderRadius: '6px', overflow: 'hidden', background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <img src="/vcard-4.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: stage === 'editing' ? 1 : 0.35 }} />
             {stage !== 'editing' && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -534,29 +696,30 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
               </div>
             )}
             {/* active segment overlay */}
-            {stage === 'editing' && activeSegId !== null && (
+            {stage === 'editing' && isPlaying && activeSegId !== null && (
               <div style={{ position: 'absolute', bottom: '8px', left: '8px', right: '8px', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: 'rgba(0,242,255,0.9)', textAlign: 'center', pointerEvents: 'none' }}>
                 {segments.find(s => s.id === activeSegId)?.range}
               </div>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '2px 4px' }}>
-            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-secondary2)' }}>
               {stage === 'editing' ? fmtSec(currentTime) : '00:00'}
-              <span style={{ color: 'rgba(255,255,255,0.3)' }}>/{fmtSec(TOTAL_DUR)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>/{fmtSec(TOTAL_DUR)}</span>
             </span>
             {stage === 'editing' && (
-              <button onClick={() => setIsPlaying(v => !v)} style={{ marginLeft: 'auto', width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', flexShrink: 0 }}>
+              <button onClick={() => setIsPlaying(v => !v)} style={{ marginLeft: 'auto', width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-primary)', flexShrink: 0 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
               </button>
             )}
-            {stage !== 'editing' && <span style={{ marginLeft: 'auto', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>▶</span>}
-            <span style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>⛶</span>
+            {stage !== 'editing' && <span style={{ marginLeft: 'auto', cursor: 'pointer', color: 'var(--text-secondary2)', fontSize: '12px' }}>▶</span>}
+            <span style={{ cursor: 'pointer', color: 'var(--text-dim)', fontSize: '12px' }}>⛶</span>
           </div>
           {/* Timeline strip */}
           <div
             ref={timelineRef}
-            style={{ height: '32px', borderRadius: '6px', background: '#0f1520', overflow: 'hidden', position: 'relative', cursor: stage === 'editing' ? 'pointer' : 'default', userSelect: 'none' }}
+            className="hero-ed-strip"
+            style={{ height: '32px', borderRadius: '6px', background: 'var(--bg-timeline)', overflow: 'hidden', position: 'relative', cursor: stage === 'editing' ? 'pointer' : 'default', userSelect: 'none' }}
             onMouseDown={stage === 'editing' ? handleTimelineMouseDown : undefined}
           >
             {stage === 'uploading' && (
@@ -572,30 +735,38 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
             )}
             {stage === 'editing' && (
               <>
-                {/* segment zones */}
-                {segments.map(seg => {
-                  const { start, end } = parseRange(seg.range)
-                  const left = (start / TOTAL_DUR) * 100
-                  const width = ((end - start) / TOTAL_DUR) * 100
-                  const isActive = seg.id === activeSegId
-                  return (
-                    <div key={seg.id} style={{ position: 'absolute', top: '4px', bottom: '4px', left: `${left}%`, width: `${width}%`, borderRadius: '4px', background: isActive ? 'rgba(0,242,255,0.45)' : 'rgba(0,242,255,0.15)', border: isActive ? '1px solid rgba(0,242,255,0.7)' : '1px solid transparent', transition: 'background 0.2s,border 0.2s' }} />
-                  )
-                })}
+                <div className="hero-ed-strip-segments" style={{ position: 'absolute', inset: '4px 5px', display: 'flex', gap: '3px', alignItems: 'stretch', zIndex: 0, pointerEvents: 'none' }}>
+                  {buildTimelinePieces(segments, TOTAL_DUR).map((piece, i) => {
+                    if (piece.kind === 'gap') {
+                      return <div key={`g-${i}`} className="hero-ed-strip-gap" style={{ flex: piece.dur, minWidth: 0, borderRadius: '4px' }} />
+                    }
+                    const { seg } = piece
+                    const r = parseRange(seg.range)
+                    const dur = r.end - r.start
+                    const isPlayingThisSeg = isPlaying && seg.id === activeSegId
+                    return (
+                      <div
+                        key={seg.id}
+                        className={isPlayingThisSeg ? 'hero-ed-strip-chunk hero-ed-strip-chunk--active' : 'hero-ed-strip-chunk'}
+                        style={{ flex: dur, minWidth: 0, borderRadius: '4px', transition: 'background 0.2s, border-color 0.2s, box-shadow 0.2s' }}
+                      />
+                    )
+                  })}
+                </div>
                 {/* playhead */}
-                <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${progressPct}%`, width: '2px', background: '#00f2ff', boxShadow: '0 0 6px rgba(0,242,255,0.8)', transition: dragging ? 'none' : 'left 0.1s linear', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${progressPct}%`, width: '2px', zIndex: 2, background: '#00f2ff', boxShadow: '0 0 6px rgba(0,242,255,0.8)', transition: dragging ? 'none' : 'left 0.1s linear', pointerEvents: 'none', marginLeft: '-1px' }} />
               </>
             )}
           </div>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
 
-        {/* Right: dialogue */}
-        <div style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Right: dialogue — 脚注固定在列底部，台词区单独滚动 */}
+        <div className="hero-ed-right" style={{ minHeight: 0, height: '100%', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
           {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 500, color: '#fff' }}>对话解析</span>
+              <span className="hero-ed-right-title" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>对话解析</span>
               <InfoTip text="对话修改后的人物口型需点击合成视频后生效" />
               {stage === 'editing' && (
                 <>
@@ -603,10 +774,10 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
                     <span className="material-symbols-outlined" style={{ fontSize: '12px', color: '#00f2ff', fontVariationSettings: '"FILL" 1' }}>check_circle</span>
                     <span style={{ fontSize: '11px', color: '#a5f3fc', whiteSpace: 'nowrap' }}>解析完成</span>
                   </div>
-                  <button onClick={onUndo} disabled={!canUndo} title="撤回" style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: canUndo ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: canUndo ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}>
+                  <button onClick={onUndo} disabled={!canUndo} title="撤回" style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-subtle)', color: canUndo ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: canUndo ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>undo</span>
                   </button>
-                  <button onClick={onRedo} disabled={!canRedo} title="重做" style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: canRedo ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: canRedo ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}>
+                  <button onClick={onRedo} disabled={!canRedo} title="重做" style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-subtle)', color: canRedo ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: canRedo ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>redo</span>
                   </button>
                 </>
@@ -621,48 +792,90 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
             </div>
             {/* Lang select */}
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowLangDrop(v => !v)} style={{ minWidth: '148px', height: '34px', padding: '0 10px', background: '#141b26', border: '1px solid #2f3d52', borderRadius: '8px', color: 'rgba(255,255,255,0.85)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={() => !langTranslating && setShowLangDrop(v => !v)}
+                disabled={stage === 'editing' && langTranslating}
+                className="hero-ed-lang-select"
+                style={{ minWidth: '148px', height: '34px', padding: '0 10px', background: 'var(--bg-panel)', border: '1px solid var(--border-main)', borderRadius: '8px', color: 'var(--text-bright)', fontSize: '13px', cursor: stage === 'editing' && langTranslating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: stage === 'editing' && langTranslating ? 0.65 : 1 }}
+              >
                 <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#00f2ff' }}>translate</span>
                 <span style={{ flex: 1, textAlign: 'left' }}>{selectedLang}</span>
-                <span className="material-symbols-outlined" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{showLangDrop ? 'expand_less' : 'expand_more'}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{showLangDrop ? 'expand_less' : 'expand_more'}</span>
               </button>
               {showLangDrop && (
-                <div style={{ position: 'absolute', right: 0, top: '38px', width: '180px', background: '#0b1d33', border: '1px solid #2f3d52', borderRadius: '8px', zIndex: 20, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', right: 0, top: '38px', width: '180px', background: 'var(--bg-dropdown)', border: '1px solid var(--border-main)', borderRadius: '8px', zIndex: 20, overflow: 'hidden' }}>
                   {LANGS.map(l => (
-                    <button key={l} onClick={() => { onLangChange(l); setShowLangDrop(false) }} style={{ width: '100%', padding: '8px 12px', textAlign: 'left', fontSize: '13px', color: l === selectedLang ? '#00f2ff' : 'rgba(255,255,255,0.8)', background: l === selectedLang ? 'rgba(0,242,255,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>{l}</button>
+                    <button
+                      key={l}
+                      type="button"
+                      className={l === selectedLang ? 'hero-ed-lang-option hero-ed-lang-option--active' : 'hero-ed-lang-option'}
+                      disabled={langTranslating}
+                      onClick={() => { if (!langTranslating) { onLangChange(l); setShowLangDrop(false) } }}
+                    >{l}</button>
                   ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Segments */}
-          {stage === 'uploading' && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.3 }}>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>上传完成后开始解析…</p>
+          {stage === 'editing' && langTranslating && (
+            <div className="hero-ed-lang-translating" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,242,255,0.08)', border: '1px solid rgba(0,242,255,0.22)' }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid rgba(0,242,255,0.35)', borderTopColor: '#00f2ff', animation: 'spin 0.75s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary2)' }}>翻译中… 正在将台词转为 <strong style={{ color: 'var(--text-bright)' }}>{selectedLang.split(' · ')[0]}</strong>，请稍候</span>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           )}
 
-          {(stage === 'parsing' || stage === 'editing') && segments.map((seg, si) => (
-            <SegmentItem
-              key={seg.id}
-              seg={seg}
-              isEditing={editingId === seg.id}
-              isActive={stage === 'editing' && seg.id === activeSegId}
-              editText={editText}
-              onEditStart={() => onEditStart(seg.id, seg.text)}
-              onEditChange={onEditChange}
-              onEditSave={() => onEditSave(seg.id)}
-              onEditCancel={onEditCancel}
-              revealedChars={stage === 'parsing' ? (twRevealed[si] ?? 0) : seg.text.length}
-              disabled={stage === 'parsing'}
-              onPlay={() => handleSegPlay(seg.id)}
-            />
-          ))}
+          <div className="hero-ed-right-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Segments */}
+            {stage === 'uploading' && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.3, minHeight: '120px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>上传完成后开始解析…</p>
+              </div>
+            )}
+
+            {/* 总字数超限：顶栏提示 */}
+            {stage === 'editing' && hasExceededLimit && warningMessage !== '' && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)', flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#fbbf24', flexShrink: 0, marginTop: '1px', fontVariationSettings: '"FILL" 1' }}>warning</span>
+                <span style={{ fontSize: '12px', color: 'rgba(251,191,36,0.9)', lineHeight: 1.5 }}>{warningMessage}，合成视频已暂停</span>
+              </div>
+            )}
+
+            {(stage === 'parsing' || stage === 'editing') && segments.map((seg, si) => (
+              <SegmentItem
+                key={seg.id}
+                seg={seg}
+                isEditing={editingId === seg.id}
+                isActive={stage === 'editing' && !langTranslating && isPlaying && seg.id === activeSegId}
+                editText={editText}
+                onEditStart={() => {
+                  setIsPlaying(false)
+                  onEditStart(seg.id, seg.text)
+                }}
+                onEditChange={onEditChange}
+                onEditSave={() => onEditSave(seg.id)}
+                onEditCancel={onEditCancel}
+                isSaving={isSaving}
+                onSavingChange={onSavingChange}
+                revealedChars={stage === 'parsing' ? (twRevealed[si] ?? 0) : seg.text.length}
+                disabled={stage === 'parsing' || (stage === 'editing' && langTranslating)}
+                onPlayToggle={() => handleSegPlayToggle(seg.id)}
+                maxSegmentChars={maxSegmentChars}
+                showSavedLengthWarn={stage === 'editing'}
+              />
+            ))}
+          </div>
+
           {stage === 'editing' && (
-            <div style={{ marginTop: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px', color: 'rgba(255,255,255,0.3)', flexShrink: 0, marginTop: '1px' }}>info</span>
-              <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>如果视频对话人数过多可能导致解析不准确，建议前往<button style={{ background: 'none', border: 'none', color: 'rgba(0,242,255,0.6)', fontSize: '12px', cursor: 'pointer', padding: 0 }}>专业剪辑</button>手动分段再对口型</p>
+            <div className="hero-ed-footnote" style={{ flexShrink: 0, padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <span className="material-symbols-outlined hero-ed-footnote-icon" style={{ fontSize: '14px', color: 'var(--text-muted)', flexShrink: 0, marginTop: '1px' }}>info</span>
+              <p className="hero-ed-footnote-text" style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
+                如发现解析不准确，您可前往
+                <button type="button" className="hero-ed-footnote-link" onClick={onNavigateProEdit} style={{ background: 'none', border: 'none', color: 'rgba(0,242,255,0.6)', fontSize: '12px', cursor: 'pointer', padding: 0 }}>「专业剪辑」</button>
+                （可点击跳转），将原视频导入并插入轨道，手动分段后，逐段右键进行 AI对口型，进一步提高准确率。
+              </p>
             </div>
           )}
         </div>
@@ -671,14 +884,29 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
   )
 }
 
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  const isLight = theme === 'light'
+  return (
+    <button
+      onClick={onToggle}
+      title={isLight ? '切换夜间模式' : '切换日间模式'}
+      style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0 }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = '#00f2ff'; e.currentTarget.style.color = '#00f2ff' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-secondary2)' }}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>{isLight ? 'dark_mode' : 'light_mode'}</span>
+    </button>
+  )
+}
+
 function InfoTip({ text }: { text: string }) {
   const [show, setShow] = useState(false)
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+    <span className="hero-ed-infotip" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
       onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-      <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.45)', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default', userSelect: 'none', lineHeight: 1 }}>i</span>
+      <span className="hero-ed-infotip-trigger" style={{ width: '16px', height: '16px', borderRadius: '50%', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default', userSelect: 'none', lineHeight: 1 }}>i</span>
       {show && (
-        <span style={{ position: 'absolute', left: '22px', top: '50%', transform: 'translateY(-50%)', background: '#1a2535', border: '1px solid #2f3d52', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', pointerEvents: 'none' }}>
+        <span className="hero-ed-infotip-bubble" style={{ position: 'absolute', left: '22px', top: '50%', transform: 'translateY(-50%)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', lineHeight: 1.45, zIndex: 50, pointerEvents: 'none', maxWidth: 'min(280px, 70vw)', width: 'max-content' }}>
           {text}
         </span>
       )}
@@ -686,70 +914,130 @@ function InfoTip({ text }: { text: string }) {
   )
 }
 
-function EdBtn({ children, primary, onClick }: { children: React.ReactNode; primary?: boolean; onClick?: () => void }) {
+function EdBtn({ children, primary, onClick, disabled }: { children: React.ReactNode; primary?: boolean; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button onClick={onClick} style={{ height: '35px', padding: '0 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s', ...(primary ? { background: 'linear-gradient(90deg,rgb(42,19,255),rgb(83,64,255),rgb(11,255,239))', color: '#fff', border: 'none' } : { background: '#141b26', border: '1px solid #2f3d52', color: 'rgba(255,255,255,0.8)' }) }}
-      onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+    <button onClick={onClick} disabled={disabled} className={primary ? 'hero-ed-btn-primary' : 'hero-ed-btn'} style={{ height: '35px', padding: '0 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.2s', opacity: disabled ? 0.45 : 1, ...(primary ? { background: 'linear-gradient(90deg,rgb(42,19,255),rgb(83,64,255),rgb(11,255,239))', color: '#ffffff', border: 'none' } : { background: 'var(--bg-panel)', border: '1px solid var(--border-main)', color: 'rgba(255,255,255,0.8)' }) }}
+      onMouseEnter={e => { if (!disabled) { e.currentTarget.style.filter = 'brightness(1.1)'; e.currentTarget.style.transform = 'translateY(-1px)' } }}
       onMouseLeave={e => { e.currentTarget.style.filter = 'none'; e.currentTarget.style.transform = 'none' }}
     >{children}</button>
   )
 }
 
 // ── SegmentItem ──
-function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditChange, onEditSave, onEditCancel, revealedChars, disabled, onPlay }: {
+function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditChange, onEditSave, onEditCancel, isSaving, onSavingChange, revealedChars, disabled, onPlayToggle, maxSegmentChars, showSavedLengthWarn }: {
   seg: typeof SEGMENTS[0]; isEditing: boolean; isActive: boolean; editText: string
   onEditStart: () => void; onEditChange: (t: string) => void; onEditSave: () => void; onEditCancel: () => void
-  revealedChars: number; disabled: boolean; onPlay: () => void
+  isSaving: boolean; onSavingChange: (v: boolean) => void
+  revealedChars: number; disabled: boolean; onPlayToggle: () => void; maxSegmentChars: number
+  /** 为 false 时不展示单段字数警告（解析阶段）；仅展示已保存文本 seg.text 的超限，编辑中不提示 */
+  showSavedLengthWarn: boolean
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => { if (isEditing) textareaRef.current?.focus() }, [isEditing])
 
+  const handleSave = () => {
+    if (editText === seg.text || isSaving) return
+    onSavingChange(true)
+    setTimeout(() => {
+      onEditSave()
+      onSavingChange(false)
+    }, 600)
+  }
+
   const displayText = seg.text.slice(0, revealedChars)
   const isCursor = revealedChars < seg.text.length
+  /** 仅已写入 seg.text 的超限在保存并退出编辑后展示；编辑框内打字数超限不提示 */
+  const segmentLengthExceeded = showSavedLengthWarn && !isEditing && seg.text.length > maxSegmentChars
+
+  const segShellClass = [isActive && 'hero-ed-seg-active', isEditing && 'hero-ed-seg-editing'].filter(Boolean).join(' ')
 
   return (
-    <div style={{ marginBottom: '6px', background: isEditing ? '#374559' : isActive ? 'rgba(0,242,255,0.07)' : 'transparent', borderRadius: '16px', padding: (isEditing || isActive) ? '10px 12px' : '8px 0', border: isActive ? '1px solid rgba(0,242,255,0.2)' : '1px solid transparent', transition: 'all 0.2s', opacity: disabled && revealedChars === 0 ? 0.2 : 1 }}>
+    <div
+      className={segShellClass}
+      style={{
+        marginBottom: '6px',
+        ...(!isEditing && {
+          background: isActive ? 'rgba(0,242,255,0.07)' : 'transparent',
+          border: isActive ? '1px solid rgba(0,242,255,0.2)' : '1px solid transparent',
+        }),
+        borderRadius: '16px',
+        padding: (isEditing || isActive) ? '10px 12px' : '8px 0',
+        transition: 'all 0.2s',
+        opacity: disabled && revealedChars === 0 ? 0.2 : 1,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+        <div className="hero-ed-spk" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-strong)' }}>
           <div style={{ width: '27px', height: '27px', borderRadius: '50%', background: 'linear-gradient(135deg,#00f2ff,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#030a1a' }}>
             {seg.speaker.replace('Speaker ', 'S')}
           </div>
           {seg.speaker}
         </div>
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace' }}>{seg.range}</span>
+          <span className="hero-ed-range" style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{seg.range}</span>
           {!disabled && (
-            <button onClick={onPlay} style={{ width: '22px', height: '22px', borderRadius: '50%', background: isActive ? 'rgba(0,242,255,0.25)' : 'rgba(255,255,255,0.08)', border: isActive ? '1px solid rgba(0,242,255,0.5)' : '1px solid rgba(255,255,255,0.12)', color: isActive ? '#00f2ff' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}>
-              <svg viewBox="0 0 15 17" fill="none" width="9" height="10"><path d="M1 1L14 8.5L1 16V1Z" fill="currentColor" /></svg>
+            <button
+              type="button"
+              className={isActive ? 'hero-ed-seg-play-btn hero-ed-seg-play-btn--active' : 'hero-ed-seg-play-btn'}
+              title={isActive ? '暂停' : '播放'}
+              onClick={e => { e.stopPropagation(); onPlayToggle() }}
+              style={{ width: '22px', height: '22px', borderRadius: '50%', background: isActive ? 'rgba(0,242,255,0.25)' : 'rgba(255,255,255,0.08)', border: isActive ? '1px solid rgba(0,242,255,0.5)' : '1px solid rgba(255,255,255,0.12)', color: isActive ? '#00f2ff' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              {isActive ? (
+                <svg viewBox="0 0 12 14" width="9" height="10" aria-hidden><rect x="1" y="1" width="3.5" height="12" rx="0.5" fill="currentColor" /><rect x="7.5" y="1" width="3.5" height="12" rx="0.5" fill="currentColor" /></svg>
+              ) : (
+                <svg viewBox="0 0 15 17" fill="none" width="9" height="10" aria-hidden><path d="M1 1L14 8.5L1 16V1Z" fill="currentColor" /></svg>
+              )}
             </button>
           )}
         </span>
       </div>
 
       {!isEditing ? (
-        <div
-          onClick={disabled ? undefined : onEditStart}
-          tabIndex={disabled ? -1 : 0}
-          style={{ fontSize: '14px', lineHeight: 1.55, color: '#ebebeb', padding: '6px 8px', borderRadius: '8px', cursor: disabled ? 'default' : 'text', transition: 'background 0.15s', minHeight: '28px' }}
-          onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-        >
-          {displayText}
-          {isCursor && <span style={{ display: 'inline-block', width: '2px', height: '1em', background: '#00f2ff', marginLeft: '1px', verticalAlign: 'middle', animation: 'blink 0.7s step-end infinite' }} />}
-        </div>
+        <>
+          <div
+            onClick={disabled ? undefined : onEditStart}
+            tabIndex={disabled ? -1 : 0}
+            className="hero-ed-text-display"
+            style={{ fontSize: '14px', lineHeight: 1.55, color: '#ebebeb', padding: '6px 8px', borderRadius: '8px', cursor: disabled ? 'default' : 'text', transition: 'background 0.15s', minHeight: '28px' }}
+            onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
+            {displayText}
+            {isCursor && <span style={{ display: 'inline-block', width: '2px', height: '1em', background: '#00f2ff', marginLeft: '1px', verticalAlign: 'middle', animation: 'blink 0.7s step-end infinite' }} />}
+          </div>
+          {segmentLengthExceeded && (
+            <div className="hero-ed-seg-length-warn" style={{ marginTop: '6px', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', lineHeight: 1.45, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.35)', color: 'rgba(251,191,36,0.95)' }}>
+              该片段字数超出 {maxSegmentChars}，请分段或精简。
+            </div>
+          )}
+        </>
       ) : (
         <div>
           <textarea ref={textareaRef} value={editText} onChange={e => onEditChange(e.target.value)} rows={4}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onEditSave() }
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (editText !== seg.text && !isSaving) handleSave()
+              }
               if (e.key === 'Escape') onEditCancel()
             }}
-            style={{ width: '100%', padding: '10px 12px', fontSize: '14px', lineHeight: 1.55, background: '#1a2330', border: '1px solid rgba(24,144,255,0.35)', borderRadius: '10px', color: '#fff', resize: 'none', outline: 'none', boxSizing: 'border-box', minHeight: '4.5em' }}
+            className="hero-ed-text-field"
+            style={{ width: '100%', padding: '10px 12px', fontSize: '14px', lineHeight: 1.55, background: 'var(--bg-input)', border: '1px solid var(--border-input)', borderRadius: '10px', color: 'var(--text-primary)', resize: 'none', outline: 'none', boxSizing: 'border-box', minHeight: '4.5em' }}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
             <div style={{ flex: 1 }} />
-            <button onClick={onEditSave} style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'rgba(24,144,255,0.2)', border: '1px solid rgba(24,144,255,0.5)', color: '#7fd6ff', fontSize: '12px', cursor: 'pointer' }}>保存</button>
-            <button onClick={onEditCancel} style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: '12px', cursor: 'pointer' }}>取消</button>
+            <button
+              type="button"
+              disabled={editText === seg.text || isSaving}
+              onClick={handleSave}
+              className="hero-ed-text-btn"
+              style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'rgba(24,144,255,0.2)', border: '1px solid rgba(24,144,255,0.5)', color: '#7fd6ff', fontSize: '12px', cursor: editText === seg.text || isSaving ? 'not-allowed' : 'pointer', opacity: editText === seg.text ? 0.45 : 1, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              {isSaving && <span style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(127,214,255,0.35)', borderTopColor: '#7fd6ff', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />}
+              {isSaving ? '保存中' : '保存'}
+            </button>
+            <button type="button" onClick={onEditCancel} className="hero-ed-text-btn" style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-secondary2)', fontSize: '12px', cursor: 'pointer' }}>取消</button>
           </div>
         </div>
       )}
@@ -766,7 +1054,7 @@ function VideoCard({ card, onPlay, onZtk }: { card: typeof CARDS[0]; onPlay: () 
       <img src={card.img} alt={card.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 5, display: 'flex', gap: '4px' }}>
         {[card.lang, card.cat].map(tag => (
-          <span key={tag} style={{ background: tag === card.lang ? 'rgba(80,16,160,0.5)' : 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: '11px', padding: '4px 8px', borderRadius: '20px', backdropFilter: 'blur(8px)', letterSpacing: '.3px' }}>{tag}</span>
+          <span key={tag} style={{ background: tag === card.lang ? 'rgba(80,16,160,0.5)' : 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.96)', fontSize: '11px', padding: '4px 8px', borderRadius: '20px', backdropFilter: 'blur(8px)', letterSpacing: '.3px' }}>{tag}</span>
         ))}
       </div>
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(180deg,rgba(0,0,0,0.08) 0%,rgba(0,0,0,0.65) 100%)', opacity: hovered ? 1 : 0.85, transition: 'opacity 0.25s' }} />
@@ -781,7 +1069,7 @@ function VideoCard({ card, onPlay, onZtk }: { card: typeof CARDS[0]; onPlay: () 
         <div style={{ opacity: hovered ? 1 : 0, transform: hovered ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.2s', marginBottom: '6px' }}>
           <ZtkButton onClick={onZtk} small />
         </div>
-        <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, lineHeight: 1.4, color: '#fff', textShadow: '0 0 1px rgba(0,0,0,0.9),0 1px 3px rgba(0,0,0,0.75)' }}>{card.title}</p>
+        <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, lineHeight: 1.4, color: 'rgba(255,255,255,0.96)', textShadow: '0 0 1px rgba(0,0,0,0.9),0 1px 3px rgba(0,0,0,0.75)' }}>{card.title}</p>
       </div>
     </div>
   )
@@ -796,7 +1084,7 @@ function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fm
     if (status === 'processing' || status === 'bg-parsing') return { border: '1px solid rgba(127,214,255,0.6)', background: 'rgba(24,144,255,0.16)', color: '#7fd6ff' }
     if (status === 'success') return { border: '1px solid rgba(72,199,142,0.8)', background: 'rgba(72,199,142,0.14)', color: '#6be6a5' }
     if (status === 'failed') return { border: '1px solid rgba(255,99,132,0.8)', background: 'rgba(255,76,76,0.14)', color: '#ff8080' }
-    return { border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }
+    return { border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary2)' }
   }
 
   const chipLabel = task.status === 'processing' ? `合成中 预计${Math.max(1, Math.round((100 - task.progress) / 5))}分钟`
@@ -807,12 +1095,13 @@ function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fm
 
   return (
     <article
+      className={`mine-card${isDraft ? ' mine-card-draft' : ''}`}
       style={{ display: 'flex', alignItems: 'stretch', gap: '18px', minHeight: '116px', background: isDraft ? 'rgba(23,29,38,0.7)' : '#171d26', borderRadius: '20px', padding: '14px 22px', border: `1px ${isDraft ? 'dashed' : 'solid'} ${isDraft ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`, transition: 'all 0.2s' }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(127,214,255,0.35)'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.45)'; e.currentTarget.style.background = isDraft ? 'rgba(28,37,49,0.8)' : '#1c2531' }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = isDraft ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = isDraft ? 'rgba(23,29,38,0.7)' : '#171d26' }}
     >
       {/* Thumb */}
-      <div style={{ width: '212px', minWidth: '212px', height: '120px', borderRadius: '10px', overflow: 'hidden', background: '#0b1d33', position: 'relative' }}>
+      <div style={{ width: '212px', minWidth: '212px', height: '120px', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-dropdown)', position: 'relative' }}>
         <img src="/vcard-1.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isDraft || isBgParsing ? 0.4 : 0.8 }} />
         {isBgParsing && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -824,15 +1113,15 @@ function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fm
 
       {/* Body */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 500, color: '#fff', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <h3 className="mine-title" style={{ margin: 0, fontSize: '17px', fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {task.name} 的合成
           {isDraft && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>保存草稿等待合成</span>}
         </h3>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           <span style={{ display: 'inline-flex', padding: '0 10px', height: '24px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, alignItems: 'center', ...chipStyle(task.status) }}>{chipLabel}</span>
-          <span style={{ display: 'inline-flex', padding: '0 10px', height: '24px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, alignItems: 'center', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.82)', background: 'rgba(0,0,0,0.15)' }}>{task.targetLanguage}</span>
-          {task.duration !== '–' && <span style={{ display: 'inline-flex', padding: '0 10px', height: '24px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, alignItems: 'center', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.82)', background: 'rgba(0,0,0,0.15)' }}>{task.duration}</span>}
+          <span style={{ display: 'inline-flex', padding: '0 10px', height: '24px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, alignItems: 'center', border: '1px solid rgba(255,255,255,0.18)', color: 'var(--text-bright)', background: 'rgba(0,0,0,0.15)' }}>{task.targetLanguage}</span>
+          {task.status === 'success' && task.duration !== '–' && <span style={{ display: 'inline-flex', padding: '0 10px', height: '24px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, alignItems: 'center', border: '1px solid rgba(255,255,255,0.18)', color: 'var(--text-bright)', background: 'rgba(0,0,0,0.15)' }}>{task.duration}</span>}
         </div>
 
         {/* Progress bar */}
@@ -845,24 +1134,24 @@ function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fm
         {/* Actions */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginTop: '2px' }}>
           {(isDraft || task.status === 'bg-parsing' && task.progress >= 100) && (
-            <button onClick={() => onResume(task)} style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff 0%,#3b82ff 50%,#7b2bff 100%)', color: '#fff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.1)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.filter = 'none' }}>继续编辑</button>
+            <button onClick={() => onResume(task)} className="mine-action-gradient" style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff 0%,#3b82ff 50%,#7b2bff 100%)', color: '#ffffff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.1)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.filter = 'none' }}>继续编辑</button>
           )}
           {task.status === 'success' && (
             <>
-              <button onClick={() => onResume(task)} style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff 0%,#3b82ff 50%,#7b2bff 100%)', color: '#fff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.1)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.filter = 'none' }}>重新编辑</button>
+              <button onClick={() => onResume(task)} className="mine-action-gradient" style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff 0%,#3b82ff 50%,#7b2bff 100%)', color: '#ffffff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.1)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.filter = 'none' }}>重新编辑</button>
               <button style={{ height: 'auto', padding: 0, border: 'none', background: 'transparent', color: 'rgba(180,190,204,0.9)', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', gap: '4px', alignItems: 'center' }}>⇩ 下载</button>
             </>
           )}
           {task.status === 'failed' && (
-            <button style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#ff6b6b,#ff4757)', color: '#fff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>重试</button>
+            <button className="mine-action-gradient" style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#ff6b6b,#ff4757)', color: '#ffffff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>重试</button>
           )}
         </div>
       </div>
 
       {/* Meta */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: '72px', paddingLeft: '12px', fontSize: '13px', color: 'rgba(255,255,255,0.45)', gap: '8px' }}>
-        <span>{fmtTime(task.createdAt)}</span>
-        <button onClick={() => onDelete(task.id)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '999px', padding: '0 14px', height: '30px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', marginTop: 'auto' }}>删除</button>
+      <div className="mine-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: '72px', paddingLeft: '12px', fontSize: '13px', color: 'var(--text-dim)', gap: '8px' }}>
+        <span className="mine-meta-time">{fmtTime(task.createdAt)}</span>
+        <button onClick={() => onDelete(task.id)} className="mine-delete-btn" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '999px', padding: '0 14px', height: '30px', fontSize: '12px', color: 'var(--text-strong)', cursor: 'pointer', marginTop: 'auto' }}>删除</button>
       </div>
     </article>
   )
@@ -875,7 +1164,7 @@ function CompareModal({ card, onClose, onZtk }: { card: typeof CARDS[0]; onClose
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(5,10,20,0.82)', backdropFilter: 'blur(20px)' }} onClick={onClose}>
-      <div style={{ position: 'relative', width: 'min(1200px,92vw)', borderRadius: '16px', background: '#111827', padding: '28px', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()}>
+      <div className="ztk-modal" style={{ position: 'relative', width: 'min(1200px,92vw)', borderRadius: '16px', background: '#111827', padding: '28px', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()}>
         {/* Close */}
         <button onClick={onClose} style={{ position: 'absolute', top: '-16px', right: '-16px', width: '36px', height: '36px', borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: '#111', fontWeight: 700, boxShadow: '0 4px 12px rgba(0,0,0,0.4)', zIndex: 10 }}>×</button>
 
@@ -883,12 +1172,12 @@ function CompareModal({ card, onClose, onZtk }: { card: typeof CARDS[0]; onClose
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
           {/* Left: original */}
           <div>
-            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', fontWeight: 500 }}>原视频</p>
-            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: '#0a0f1a', aspectRatio: '16/9' }}>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary2)', marginBottom: '10px', fontWeight: 500 }}>原视频</p>
+            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-deep)', aspectRatio: '16/9' }}>
               <img src={card.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {/* Play/pause overlay */}
               <div style={{ position: 'absolute', bottom: '12px', left: '12px' }}>
-                <button onClick={() => setLeftPlaying(v => !v)} style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+                <button onClick={() => setLeftPlaying(v => !v)} style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.96)' }}>
                   {leftPlaying ? (
                     <svg width="10" height="12" viewBox="0 0 10 12" fill="white"><rect x="0" y="0" width="3.5" height="12" /><rect x="6.5" y="0" width="3.5" height="12" /></svg>
                   ) : (
@@ -905,11 +1194,11 @@ function CompareModal({ card, onClose, onZtk }: { card: typeof CARDS[0]; onClose
 
           {/* Right: synthesized */}
           <div>
-            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', fontWeight: 500 }}>合成后</p>
-            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: '#0a0f1a', aspectRatio: '16/9' }}>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary2)', marginBottom: '10px', fontWeight: 500 }}>合成后</p>
+            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: 'var(--bg-deep)', aspectRatio: '16/9' }}>
               <img src={card.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'hue-rotate(12deg) saturate(1.1)' }} />
               <div style={{ position: 'absolute', bottom: '12px', right: '12px' }}>
-                <button onClick={() => setRightPlaying(v => !v)} style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+                <button onClick={() => setRightPlaying(v => !v)} style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.96)' }}>
                   {rightPlaying ? (
                     <svg width="10" height="12" viewBox="0 0 10 12" fill="white"><rect x="0" y="0" width="3.5" height="12" /><rect x="6.5" y="0" width="3.5" height="12" /></svg>
                   ) : (
@@ -923,10 +1212,10 @@ function CompareModal({ card, onClose, onZtk }: { card: typeof CARDS[0]; onClose
 
         {/* Footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <p style={{ margin: 0, fontSize: '16px', fontWeight: 500, color: '#fff' }}>{card.title}</p>
+          <p className="ztk-modal-title-text" style={{ margin: 0, fontSize: '16px', fontWeight: 500, color: 'var(--text-primary)' }}>{card.title}</p>
           <button
             onClick={onZtk}
-            style={{ height: '44px', padding: '0 28px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff,#3b82ff)', color: '#fff', fontSize: '15px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
+            style={{ height: '44px', padding: '0 28px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff,#3b82ff)', color: '#ffffff', fontSize: '15px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.08)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
             onMouseLeave={e => { e.currentTarget.style.filter = 'none'; e.currentTarget.style.transform = 'none' }}
           >做同款</button>
@@ -940,15 +1229,15 @@ function CompareModal({ card, onClose, onZtk }: { card: typeof CARDS[0]; onClose
 function ZtkModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,8,18,0.86)', backdropFilter: 'blur(18px)', zIndex: 100 }} onClick={onClose}>
-      <div style={{ position: 'relative', width: '480px', maxWidth: 'calc(100% - 64px)', borderRadius: '18px', padding: '24px', background: 'radial-gradient(circle at top left,rgba(0,242,234,0.15) 0%,rgba(0,50,80,0.8) 50%,rgba(3,10,26,0.95) 100%)', border: '1px solid rgba(0,242,234,0.38)', boxShadow: '0 24px 80px rgba(0,0,0,0.72)', color: '#fff' }} onClick={e => e.stopPropagation()}>
+      <div style={{ position: 'relative', width: '480px', maxWidth: 'calc(100% - 64px)', borderRadius: '18px', padding: '24px', background: 'radial-gradient(circle at top left,rgba(0,242,234,0.15) 0%,rgba(0,50,80,0.8) 50%,rgba(3,10,26,0.95) 100%)', border: '1px solid rgba(0,242,234,0.38)', boxShadow: '0 24px 80px rgba(0,0,0,0.72)', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '17px', fontWeight: 600 }}>
             <span style={{ width: '26px', height: '26px', borderRadius: '999px', background: 'radial-gradient(circle at 30% 0%,#00f2ea,#00b3ff)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>✦</span>
             做同款 · 一键复用示例视频
           </div>
-          <button onClick={onClose} style={{ width: '24px', height: '24px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.28)', background: 'rgba(8,10,18,0.86)', color: 'rgba(255,255,255,0.72)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px' }}>×</button>
+          <button onClick={onClose} style={{ width: '24px', height: '24px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.28)', background: 'rgba(8,10,18,0.86)', color: 'var(--text-strong)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px' }}>×</button>
         </div>
-        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.68)', lineHeight: 1.7, marginBottom: '16px' }}>已为你预设好模板、台词和配音参数。登录后即可将当前示例复制到「我的作品」，并替换为你自己的素材一键生成。</p>
+        <p style={{ fontSize: '13px', color: 'var(--text-strong)', lineHeight: 1.7, marginBottom: '16px' }}>已为你预设好模板、台词和配音参数。登录后即可将当前示例复制到「我的作品」，并替换为你自己的素材一键生成。</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px', marginBottom: '18px' }}>
           {['保留原示例分镜与节奏', '自动继承语言 / 字幕样式', '支持替换人物 / 台词内容', '生成前可二次编辑预览'].map(item => (
             <div key={item} style={{ padding: '7px 10px', borderRadius: '999px', border: '1px solid rgba(0,242,234,0.24)', background: 'radial-gradient(circle at top,rgba(0,242,234,0.1),transparent)', fontSize: '12px', color: 'rgba(230,247,255,0.88)', display: 'inline-flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
@@ -958,7 +1247,7 @@ function ZtkModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.56)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ padding: '2px 8px', borderRadius: '999px', border: '1px solid rgba(0,242,234,0.5)', fontSize: '11px', color: 'rgba(0,242,234,0.96)', background: 'rgba(0,242,234,0.08)' }}>提示</span>
             登录后可在「我的作品」中再次编辑。
           </div>
