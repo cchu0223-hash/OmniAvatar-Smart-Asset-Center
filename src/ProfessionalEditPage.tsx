@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom'
 import { useTour } from './useTour'
 import { getMaterials, addMaterial, deleteMaterial, subscribe, type SharedSmartMaterial } from './smartMaterialsStore'
 
-type SidebarTool = '我的素材' | '虚拟人' | '图片' | '配音' | '音乐' | '文本' | '转场' | '模板' | '贴纸' | '素材优化'
+type SidebarTool = '我的素材' | '虚拟人' | '图片' | '配音' | '音乐' | '文本' | '转场' | '模板' | '贴纸' | '素材优化' | '对口型'
+type LipSyncPanelStage = 'parsing' | 'editing' | 'generating' | 'done'
 type OptimizeTab = '素材更换' | '素材编辑' | '动画效果'
 type OptimizeReplaceSubTab = '图片生成' | '视频生成'
 type AnimSubTab = '入场动画' | '出场动画'
@@ -149,51 +150,6 @@ function ProfessionalEditPage() {
   const [smartMaterialFilter, setSmartMaterialFilter] = useState<'图片' | '视频'>('图片')
   const [showCreditsHistory, setShowCreditsHistory] = useState(false)
 
-  // 时间轴轨道数据
-  const [timelineClips, setTimelineClips] = useState<TimelineClip[]>([
-    { id: 'main1', trackType: 'main', clipType: 'video', startTime: 0, duration: 5, label: 'Clip_01.mp4', imageUrl: 'https://picsum.photos/seed/clip01/400/225', prompt: '专业商务场景' },
-    { id: 'main2', trackType: 'main', clipType: 'image', startTime: 5, duration: 3, label: 'photo_001.jpg', imageUrl: 'https://picsum.photos/seed/local01/400/225', prompt: '' },
-    { id: 'sub1', trackType: 'sub', clipType: 'image', startTime: 2, duration: 3, label: 'overlay_01.png', imageUrl: 'https://picsum.photos/seed/sub01/400/225', prompt: '叠加素材' },
-  ])
-
-  // 素材替换核心逻辑
-  const replaceClip = useCallback((clipId: string, newClipType: ClipType) => {
-    setTimelineClips(prev => {
-      const clipIndex = prev.findIndex(c => c.id === clipId)
-      if (clipIndex === -1) return prev
-
-      const clip = prev[clipIndex]
-      const oldDuration = clip.duration
-      const newDuration = newClipType === 'image' ? 3 : 5
-      const timeDiff = newDuration - oldDuration
-
-      if (timeDiff === 0) {
-        // C类：等长替换，仅更新内容
-        return prev.map(c => c.id === clipId ? { ...c, clipType: newClipType, duration: newDuration } : c)
-      }
-
-      const newClips = [...prev]
-      newClips[clipIndex] = { ...clip, clipType: newClipType, duration: newDuration }
-
-      if (clip.trackType === 'main') {
-        // A1/B1：主轨道替换
-        const clipEndTime = clip.startTime + oldDuration
-        newClips.forEach((c, i) => {
-          if (i === clipIndex) return
-          if (c.trackType === 'main' && c.startTime >= clipEndTime) {
-            // 主轨道后续片段
-            c.startTime += timeDiff
-          } else if (c.trackType === 'sub' && c.startTime >= clipEndTime) {
-            // 副轨道区间后
-            c.startTime += timeDiff
-          }
-        })
-      }
-      // A2/B2：副轨道替换，其他轨道不变
-
-      return newClips
-    })
-  }, [])
   const [smartMaterialSearch, setSmartMaterialSearch] = useState('')
 
   const handleDeleteSmartMaterial = (id: string) => {
@@ -242,17 +198,18 @@ function ProfessionalEditPage() {
 
   // ── Context menu ──
   // Anchored to clip's top-right corner: right = distance from viewport right, bottom = distance from clip top
-  const [contextMenu, setContextMenu] = useState<{ right: number; bottom: number; clipId: string } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ top: number; left: number; clipId: string } | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const clip01ChipRef = useRef<HTMLDivElement>(null)
 
-  // ── Multimodal confirm modal ──
-  const [showMultimodalConfirmModal, setShowMultimodalConfirmModal] = useState(false)
-
-  // ── Lip sync modal ──
-  const [showLipSyncModal, setShowLipSyncModal] = useState(false)
+  // ── Lip sync panel ──
+  const [hasLipSyncPanel, setHasLipSyncPanel] = useState(false)
+  const [lipSyncPanelStage, setLipSyncPanelStage] = useState<LipSyncPanelStage>('parsing')
+  const [lipSyncProgress, setLipSyncProgress] = useState(0)
   const [lipSyncLang, setLipSyncLang] = useState('中文')
   const [lipSyncSegments, setLipSyncSegments] = useState<AsrSegment[]>(LIP_SYNC_SEGMENT_TRANSLATIONS['中文'])
+  const [segHistory, setSegHistory] = useState<AsrSegment[][]>([LIP_SYNC_SEGMENT_TRANSLATIONS['中文']])
+  const [segHistIdx, setSegHistIdx] = useState(0)
   const [lipSyncTranslating, setLipSyncTranslating] = useState(false)
   const [showLipSyncLangDropdown, setShowLipSyncLangDropdown] = useState(false)
   const lipSyncLangDropdownRef = useRef<HTMLDivElement>(null)
@@ -262,9 +219,7 @@ function ProfessionalEditPage() {
 
   // ── Timeline clip/track states ──
   const [clip01Loading, setClip01Loading] = useState(false)
-  const [clip01Muted, setClip01Muted] = useState(false)
-  const [hasLipSyncV2, setHasLipSyncV2] = useState(false)
-  const [hasMultimodalTracks, setHasMultimodalTracks] = useState(false)
+  const [hasLipSyncDone, setHasLipSyncDone] = useState(false)
 
   // ── Helpers ──
   const showToast = useCallback((msg: string) => {
@@ -296,8 +251,8 @@ function ProfessionalEditPage() {
     if (clip01ChipRef.current && !clip01Loading) {
       const rect = clip01ChipRef.current.getBoundingClientRect()
       setContextMenu({
-        right: window.innerWidth - rect.right,
-        bottom: window.innerHeight - rect.top + 4,
+        top: rect.top,
+        left: rect.right + 4,
         clipId: 'main1',
       })
     }
@@ -387,6 +342,22 @@ function ProfessionalEditPage() {
   )
 
 
+  // parsing 自动跳转 editing
+  useEffect(() => {
+    if (lipSyncPanelStage !== 'parsing') return
+    let prog = 0
+    const interval = setInterval(() => {
+      prog += Math.random() * 15 + 10
+      if (prog >= 100) {
+        clearInterval(interval)
+        setLipSyncPanelStage('editing')
+      } else {
+        setLipSyncProgress(prog)
+      }
+    }, 200)
+    return () => clearInterval(interval)
+  }, [lipSyncPanelStage])
+
   // Close popovers on outside click
   useEffect(() => {
     if (!imagePopover && !videoPopover) return
@@ -450,8 +421,8 @@ function ProfessionalEditPage() {
     if (clip01ChipRef.current) {
       const rect = clip01ChipRef.current.getBoundingClientRect()
       setContextMenu({
-        right: window.innerWidth - rect.right,
-        bottom: window.innerHeight - rect.top + 4,
+        top: rect.top,
+        left: rect.right + 4,
         clipId: 'main1',
       })
     }
@@ -459,23 +430,15 @@ function ProfessionalEditPage() {
 
   const handleOpenLipSync = () => {
     setContextMenu(null)
-    setShowLipSyncModal(true)
-  }
-
-  const handleMultimodalSplit = () => {
-    setContextMenu(null)
-    setShowMultimodalConfirmModal(true)
-  }
-
-  const handleMultimodalConfirm = () => {
-    setShowMultimodalConfirmModal(false)
-    setClip01Loading(true)
-    setTimeout(() => {
-      setClip01Loading(false)
-      setClip01Muted(true)
-      setHasMultimodalTracks(true)
-      showToast('多模态拆分完成，已分离画面、人声与背景音')
-    }, 5000)
+    setHasLipSyncPanel(true)
+    setActiveTool('对口型')
+    if (hasLipSyncDone) {
+      // 已完成过对口型，直接进入编辑台词
+      setLipSyncPanelStage('editing')
+    } else {
+      setLipSyncPanelStage('parsing')
+      setLipSyncProgress(0)
+    }
   }
 
   // ── Lip sync handlers ──
@@ -490,24 +453,46 @@ function ProfessionalEditPage() {
   }
 
   const handleSegmentTextChange = (id: number, newText: string) => {
-    setLipSyncSegments(prev => prev.map(s => s.id === id ? { ...s, text: newText } : s))
+    setLipSyncSegments(prev => {
+      const next = prev.map(s => s.id === id ? { ...s, text: newText } : s)
+      setSegHistory(h => { const nh = h.slice(0, segHistIdx + 1); nh.push(next); return nh })
+      setSegHistIdx(i => i + 1)
+      return next
+    })
+  }
+  const handleSegUndo = () => {
+    if (segHistIdx <= 0) return
+    const ni = segHistIdx - 1
+    setSegHistIdx(ni)
+    setLipSyncSegments(segHistory[ni])
+  }
+  const handleSegRedo = () => {
+    if (segHistIdx >= segHistory.length - 1) return
+    const ni = segHistIdx + 1
+    setSegHistIdx(ni)
+    setLipSyncSegments(segHistory[ni])
   }
 
-  const handleSegmentConfirm = (id: number) => {
-    setLipSyncSegments(prev => prev.map(s => s.id === id ? { ...s, refreshing: true } : s))
-    setTimeout(() => {
-      setLipSyncSegments(prev => prev.map(s => s.id === id ? { ...s, refreshing: false } : s))
-    }, 800)
-  }
-
-  const handleLipSyncConfirm = () => {
-    setShowLipSyncModal(false)
+const handleLipSyncStart = () => {
+    setLipSyncPanelStage('generating')
+    setLipSyncProgress(0)
     setClip01Loading(true)
-    setTimeout(() => {
-      setClip01Loading(false)
-      setHasLipSyncV2(true)
-      showToast('对口型视频已生成')
-    }, 5000)
+    // 模拟进度
+    let prog = 0
+    const interval = setInterval(() => {
+      prog += Math.random() * 8 + 3
+      if (prog >= 100) {
+        prog = 100
+        clearInterval(interval)
+        setLipSyncProgress(100)
+        setClip01Loading(false)
+        setHasLipSyncDone(true)
+        setLipSyncPanelStage('done')
+        showToast('对口型视频已生成，已替换 V1 轨道')
+      } else {
+        setLipSyncProgress(prog)
+      }
+    }, 400)
   }
 
   // ── Material Optimize Panel (shown when track is selected) ──
@@ -1162,6 +1147,28 @@ function ProfessionalEditPage() {
                 </>
               )
             })()}
+            {/* ── 对口型 (appears after first trigger) ── */}
+            {hasLipSyncPanel && (() => {
+              const active = activeTool === '对口型'
+              return (
+                <>
+                  <div className="mx-2 my-1" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                  <button
+                    onClick={() => setActiveTool('对口型')}
+                    className="relative flex flex-col items-center gap-0.5 cursor-pointer transition-colors py-2.5 w-full shrink-0"
+                    style={{ color: active ? '#00f0ff' : 'rgba(0,240,255,0.45)', borderLeft: active ? '2px solid #00f0ff' : '2px solid transparent', backgroundColor: active ? 'rgba(0,240,255,0.06)' : 'transparent' }}
+                    aria-label="对口型"
+                    aria-pressed={active}
+                  >
+                    <div className="relative">
+                      <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>record_voice_over</span>
+                      <span className="absolute -top-1 -right-2 text-[7px] font-black px-0.5 rounded" style={{ background: 'linear-gradient(135deg,#7000ff,#00f2ea)', color: 'white', lineHeight: '1.4' }}>AI</span>
+                    </div>
+                    <span className="text-[9px] leading-tight text-center">对口型</span>
+                  </button>
+                </>
+              )
+            })()}
           </nav>
         </aside>
 
@@ -1171,7 +1178,26 @@ function ProfessionalEditPage() {
 
             {/* ── Left Panel (resizable) ── */}
             <aside id="tour-material-panel" className="flex flex-col border-r shrink-0 overflow-hidden relative" style={{ width: `${leftPanelWidth}px`, backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
-              {activeTool === '素材优化' && selectedTrack ? (
+              {activeTool === '对口型' ? (
+                <LipSyncPanel
+                  stage={lipSyncPanelStage}
+                  progress={lipSyncProgress}
+                  lang={lipSyncLang}
+                  segments={lipSyncSegments}
+                  translating={lipSyncTranslating}
+                  showLangDropdown={showLipSyncLangDropdown}
+                  langDropdownRef={lipSyncLangDropdownRef}
+                  onLangChange={handleLipSyncLangChange}
+                  onToggleLangDropdown={() => setShowLipSyncLangDropdown(v => !v)}
+                  onSegmentChange={handleSegmentTextChange}
+                  onUndo={handleSegUndo}
+                  onRedo={handleSegRedo}
+                  canUndo={segHistIdx > 0}
+                  canRedo={segHistIdx < segHistory.length - 1}
+                  onStart={handleLipSyncStart}
+                  onClose={() => { setActiveTool('我的素材') }}
+                />
+              ) : activeTool === '素材优化' && selectedTrack ? (
                 <MaterialOptimizePanel />
               ) : (
                 <>
@@ -1243,90 +1269,61 @@ function ProfessionalEditPage() {
               </div>
             </div>
 
-            {/* V2 Track – Lip Sync result (shown after lip sync completes) */}
-            {hasLipSyncV2 && (
-              <div className="h-12 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div className="w-16 shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ backgroundColor: 'rgba(0,240,255,0.04)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(0,240,255,0.7)' }} aria-hidden="true">record_voice_over</span>
-                  <span className="text-[8px] font-bold" style={{ color: 'rgba(0,240,255,0.5)' }}>V2</span>
-                </div>
-                <div className="flex-1 relative p-1" style={{ backgroundColor: 'rgba(0,240,255,0.01)' }}>
-                  <div className="absolute rounded px-2 flex items-center gap-2 overflow-hidden" style={{ left: `${CLIP_LEFT}px`, width: `${CLIP_WIDTH}px`, height: '40px', top: '2px', backgroundColor: 'rgba(0,240,255,0.12)', borderLeft: '2px solid rgba(0,240,255,0.8)' }}>
-                    <div className="w-10 h-full opacity-40 rounded shrink-0" style={{ backgroundColor: 'rgba(0,240,255,0.15)' }}></div>
-                    <span className="text-[10px] truncate" style={{ color: '#a5f3fc' }}>Clip_01（对口型）.mp4</span>
-                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,240,255,0.2)', color: '#00f0ff' }}>NEW</span>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* Video Track 1 – Clip_01 (main, possibly loading/muted/deleted) */}
+            {/* Video Track 1 – Clip_01 (replaced in-place after lip sync) */}
             <div className="h-12 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div className="w-16 shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                <span className="material-symbols-outlined text-xs" style={{ color: clip01Muted ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.4)' }} aria-hidden="true">videocam</span>
+                <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(148,163,184,0.4)' }} aria-hidden="true">videocam</span>
                 <span className="text-[8px]" style={{ color: 'rgba(148,163,184,0.3)' }}>V1</span>
               </div>
               <div className="flex-1 relative p-1" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                {/* Clip_01 chip – hidden after lip sync completes (original deleted) */}
-                {!hasLipSyncV2 && (
-                  <div
-                    id="track-clip-01"
-                    ref={clip01ChipRef}
-                    className="absolute rounded px-2 flex items-center gap-2 overflow-hidden select-none"
-                    style={{
-                      left: `${CLIP_LEFT}px`,
-                      width: `${CLIP_WIDTH}px`,
-                      height: '40px',
-                      top: '2px',
-                      backgroundColor: clip01Muted ? 'rgba(0,102,255,0.06)' : 'rgba(0,102,255,0.2)',
-                      borderLeft: `2px solid ${clip01Muted ? 'rgba(0,102,255,0.25)' : '#0066FF'}`,
-                      opacity: clip01Muted ? 0.55 : 1,
-                      cursor: clip01Loading ? 'not-allowed' : 'pointer',
-                      transition: 'opacity 0.3s, background-color 0.3s',
-                      outline: selectedTrack?.id === 'clip01' ? '2px solid #0066FF' : 'none',
-                      outlineOffset: '1px',
-                    }}
-                    onClick={() => { if (!clip01Loading) { setSelectedTrack(TRACK_CLIPS[0]); setActiveTool('素材优化'); setOptimizeTab('素材更换') } }}
-                    onContextMenu={handleClip01ContextMenu}
-                    title={clip01Loading ? '处理中，暂不可操作' : '点击选中，右键查看操作'}
-                  >
-                    <div className="w-10 h-full opacity-50 rounded shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}></div>
-                    <span className="text-[10px] truncate flex-1" style={{ color: '#93c5fd' }}>Clip_01.mp4</span>
-                    {clip01Muted && !clip01Loading && (
-                      <span className="material-symbols-outlined text-xs shrink-0" style={{ color: 'rgba(148,163,184,0.4)' }} aria-label="已静音" title="静音">volume_off</span>
-                    )}
-                    {/* Loading overlay */}
-                    {clip01Loading && (
-                      <div className="absolute inset-0 flex items-center justify-center rounded" style={{ backgroundColor: 'rgba(0,0,0,0.65)' }} aria-live="polite" aria-label="片段处理中">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin shrink-0" style={{ borderColor: '#0066FF', borderTopColor: 'transparent' }}></div>
-                          <span className="text-[9px] font-medium" style={{ color: '#60a5fa' }}>处理中…</span>
-                        </div>
+                <div
+                  id="track-clip-01"
+                  ref={clip01ChipRef}
+                  className="absolute rounded px-2 flex items-center gap-2 overflow-hidden select-none"
+                  style={{
+                    left: `${CLIP_LEFT}px`,
+                    width: `${CLIP_WIDTH}px`,
+                    height: '40px',
+                    top: '2px',
+                    backgroundColor: hasLipSyncDone ? 'rgba(0,240,255,0.12)' : 'rgba(0,102,255,0.2)',
+                    borderLeft: `2px solid ${hasLipSyncDone ? 'rgba(0,240,255,0.8)' : '#0066FF'}`,
+                    cursor: clip01Loading ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.4s, border-color 0.4s',
+                    outline: selectedTrack?.id === 'clip01' ? '2px solid #0066FF' : 'none',
+                    outlineOffset: '1px',
+                  }}
+                  onClick={() => { if (!clip01Loading) { setSelectedTrack(TRACK_CLIPS[0]); setActiveTool('素材优化'); setOptimizeTab('素材更换') } }}
+                  onContextMenu={handleClip01ContextMenu}
+                  title={clip01Loading ? '对口型生成中，暂不可操作' : '点击选中，右键查看操作'}
+                >
+                  <div className="w-10 h-full opacity-50 rounded shrink-0" style={{ backgroundColor: hasLipSyncDone ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.1)' }}></div>
+                  <span className="text-[10px] truncate flex-1" style={{ color: hasLipSyncDone ? '#a5f3fc' : '#93c5fd' }}>
+                    {hasLipSyncDone ? 'Clip_01（对口型）.mp4' : 'Clip_01.mp4'}
+                  </span>
+                  {hasLipSyncDone && !clip01Loading && (
+                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,240,255,0.2)', color: '#00f0ff' }}>对口型</span>
+                  )}
+                  {/* Generating progress overlay */}
+                  {clip01Loading && lipSyncPanelStage === 'generating' && (
+                    <div className="absolute inset-0 rounded overflow-hidden" aria-live="polite">
+                      <div
+                        className="absolute inset-y-0 left-0 transition-all"
+                        style={{
+                          width: `${lipSyncProgress}%`,
+                          background: 'linear-gradient(90deg,rgba(112,0,255,0.45),rgba(0,242,234,0.45))',
+                          transition: 'width 0.35s ease',
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[9px] font-medium" style={{ color: '#e0f7ff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>对口型中 {Math.round(lipSyncProgress)}%</span>
                       </div>
-                    )}
-                  </div>
-                )}
-                {/* Invisible ref holder so context menu anchor still works during loading */}
-                {hasLipSyncV2 && <div ref={clip01ChipRef} />}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Multimodal Video Track – Clip_01（无声）(same position as V1) */}
-            {hasMultimodalTracks && (
-              <div className="h-12 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div className="w-16 shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ backgroundColor: 'rgba(255,165,0,0.04)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(251,191,36,0.7)' }} aria-hidden="true">videocam</span>
-                  <span className="text-[8px] font-bold" style={{ color: 'rgba(251,191,36,0.5)' }}>无声</span>
-                </div>
-                <div className="flex-1 relative p-1" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                  <div className="absolute rounded px-2 flex items-center gap-2 overflow-hidden" style={{ left: `${CLIP_LEFT}px`, width: `${CLIP_WIDTH}px`, height: '40px', top: '2px', backgroundColor: 'rgba(251,191,36,0.1)', borderLeft: '2px solid rgba(251,191,36,0.7)' }}>
-                    <div className="w-10 h-full opacity-40 rounded shrink-0" style={{ backgroundColor: 'rgba(251,191,36,0.15)' }}></div>
-                    <span className="text-[10px] truncate flex-1" style={{ color: '#fde68a' }}>Clip_01（无声）.mp4</span>
-                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>NEW</span>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Video Track 2 – 本地上传素材 */}
             <div className="h-12 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1348,7 +1345,7 @@ function ProfessionalEditPage() {
                     outlineOffset: '1px',
                     transition: 'background-color 0.2s',
                   }}
-                  onClick={() => { setSelectedTrack(TRACK_CLIPS[1]); setActiveTool('素材优化'); setOptimizeTab('动画效果') }}
+                  onClick={() => { setSelectedTrack(TRACK_CLIPS[1]); setActiveTool('素材优化'); setOptimizeTab('动画效果'); setHasLipSyncPanel(false) }}
                   title="点击选中，进入素材优化"
                 >
                   {/* Thumbnail strip */}
@@ -1378,39 +1375,6 @@ function ProfessionalEditPage() {
               </div>
             </div>
 
-            {/* A1 – 人声 track (after multimodal split) */}
-            {hasMultimodalTracks && (
-              <div className="h-10 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div className="w-16 shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ backgroundColor: 'rgba(139,92,246,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(167,139,250,0.7)' }} aria-hidden="true">record_voice_over</span>
-                  <span className="text-[8px] font-bold" style={{ color: 'rgba(167,139,250,0.5)' }}>A1</span>
-                </div>
-                <div className="flex-1 relative p-1" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                  <div className="absolute rounded px-2 flex items-center gap-2 overflow-hidden" style={{ left: `${CLIP_LEFT}px`, width: `${CLIP_WIDTH}px`, height: '28px', top: '4px', backgroundColor: 'rgba(139,92,246,0.12)', borderLeft: '2px solid rgba(139,92,246,0.7)' }}>
-                    <span className="material-symbols-outlined text-xs shrink-0" style={{ color: 'rgba(167,139,250,0.8)' }} aria-hidden="true">mic</span>
-                    <span className="text-[10px] truncate" style={{ color: '#c4b5fd' }}>Clip_01（人声）.mp3</span>
-                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>NEW</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* A2 – BGM track (after multimodal split) */}
-            {hasMultimodalTracks && (
-              <div className="h-10 flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div className="w-16 shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ backgroundColor: 'rgba(236,72,153,0.04)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span className="material-symbols-outlined text-xs" style={{ color: 'rgba(244,114,182,0.7)' }} aria-hidden="true">queue_music</span>
-                  <span className="text-[8px] font-bold" style={{ color: 'rgba(244,114,182,0.5)' }}>A2</span>
-                </div>
-                <div className="flex-1 relative p-1" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                  <div className="absolute rounded px-2 flex items-center gap-2 overflow-hidden" style={{ left: `${CLIP_LEFT}px`, width: `${CLIP_WIDTH}px`, height: '28px', top: '4px', backgroundColor: 'rgba(236,72,153,0.1)', borderLeft: '2px solid rgba(236,72,153,0.7)' }}>
-                    <span className="material-symbols-outlined text-xs shrink-0" style={{ color: 'rgba(244,114,182,0.8)' }} aria-hidden="true">music_note</span>
-                    <span className="text-[10px] truncate" style={{ color: '#fbcfe8' }}>Clip_01（BGM）.mp3</span>
-                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(236,72,153,0.2)', color: '#f472b6' }}>NEW</span>
-                  </div>
-                </div>
-              </div>
-            )}
 
           </div>
         </div>
@@ -1424,8 +1388,8 @@ function ProfessionalEditPage() {
           ref={contextMenuRef}
           className="fixed rounded-xl overflow-hidden shadow-2xl py-1"
           style={{
-            right: contextMenu.right,
-            bottom: contextMenu.bottom,
+            top: contextMenu.top,
+            left: contextMenu.left,
             minWidth: '188px',
             /* z-index 100100 — above driver.js overlay (100000) so tour can highlight menu items */
             zIndex: 100100,
@@ -1463,383 +1427,13 @@ function ProfessionalEditPage() {
             onClick={handleOpenLipSync}
             role="menuitem"
             className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-            style={{ color: 'rgba(203,213,225,0.9)' }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
+            style={{ color: 'rgba(0,240,255,0.9)' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(0,240,255,0.07)' }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
           >
-            <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(148,163,184,0.55)' }} aria-hidden="true">record_voice_over</span>
+            <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(0,240,255,0.7)' }} aria-hidden="true">record_voice_over</span>
             视频人物对口型
           </button>
-
-          <button
-            id="ctx-menu-multimodal"
-            onClick={handleMultimodalSplit}
-            role="menuitem"
-            className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-            style={{ color: 'rgba(203,213,225,0.9)' }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-          >
-            <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(148,163,184,0.55)' }} aria-hidden="true">layers</span>
-            视频多模态拆分
-          </button>
-
-          {/* 素材替换 */}
-          {contextMenu.clipId && (() => {
-            const clip = timelineClips.find(c => c.id === contextMenu.clipId)
-            if (!clip) return null
-            const canReplaceWithImage = clip.clipType !== 'image'
-            const canReplaceWithVideo = clip.clipType !== 'video'
-            return (
-              <>
-                <div className="my-1 mx-3" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }}></div>
-                <div className="px-4 py-1.5">
-                  <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'rgba(148,163,184,0.4)' }}>素材替换</span>
-                </div>
-                {canReplaceWithImage && (
-                  <button
-                    onClick={() => { replaceClip(contextMenu.clipId!, 'image'); setContextMenu(null); showToast(`已替换为图片 (3s)，${clip.trackType === 'main' ? '主轨道后续片段已前移' : '其他轨道不受影响'}`) }}
-                    role="menuitem"
-                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-                    style={{ color: 'rgba(203,213,225,0.9)' }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                  >
-                    <span className="material-symbols-outlined text-base shrink-0" style={{ color: '#60a5fa' }} aria-hidden="true">image</span>
-                    替换为图片 (3s)
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}>
-                      {clip.trackType === 'main' ? `-${clip.duration - 3}s` : '仅本轨'}
-                    </span>
-                  </button>
-                )}
-                {canReplaceWithVideo && (
-                  <button
-                    onClick={() => { replaceClip(contextMenu.clipId!, 'video'); setContextMenu(null); showToast(`已替换为视频 (5s)，${clip.trackType === 'main' ? '主轨道后续片段已延后' : '其他轨道不受影响'}`) }}
-                    role="menuitem"
-                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-                    style={{ color: 'rgba(203,213,225,0.9)' }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                  >
-                    <span className="material-symbols-outlined text-base shrink-0" style={{ color: '#a78bfa' }} aria-hidden="true">videocam</span>
-                    替换为视频 (5s)
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
-                      {clip.trackType === 'main' ? `+${5 - clip.duration}s` : '仅本轨'}
-                    </span>
-                  </button>
-                )}
-              </>
-            )
-          })()}
-        </div>
-      )}
-
-      {/* ══ Lip Sync Modal ══ */}
-      {showLipSyncModal && (
-        <div
-          className="fixed inset-0 z-[20000] flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lip-sync-title"
-        >
-          <div
-            className="relative w-[600px] rounded-2xl overflow-hidden flex flex-col"
-            style={{ backgroundColor: '#111114', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)', maxHeight: '85vh' }}
-          >
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <h2 id="lip-sync-title" className="text-base font-semibold text-white">视频对口型</h2>
-              <button
-                onClick={() => setShowLipSyncModal(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                style={{ color: 'rgba(148,163,184,0.6)' }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                aria-label="关闭弹窗"
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">close</span>
-              </button>
-            </div>
-
-            {/* Modal body – scrollable */}
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-
-              {/* Section: 视频讲话内容 */}
-              <div className="flex flex-col gap-3">
-                {/* Row: label + language dropdown */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">视频讲话内容</span>
-
-                  {/* Target language dropdown */}
-                  <div ref={lipSyncLangDropdownRef} className="relative">
-                    <button
-                      onClick={() => setShowLipSyncLangDropdown(v => !v)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                      style={{ backgroundColor: 'rgba(0,102,255,0.1)', border: '1px solid rgba(0,102,255,0.3)', color: '#60a5fa' }}
-                      aria-label={`目标语种: ${lipSyncLang}`}
-                      aria-expanded={showLipSyncLangDropdown}
-                    >
-                      <span className="material-symbols-outlined text-sm" aria-hidden="true">translate</span>
-                      <span>目标语种：{lipSyncLang}</span>
-                      <span
-                        className="material-symbols-outlined text-xs"
-                        style={{ transform: showLipSyncLangDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-                        aria-hidden="true"
-                      >expand_more</span>
-                    </button>
-                    {showLipSyncLangDropdown && (
-                      <div className="absolute right-0 mt-1 w-32 rounded-lg shadow-2xl overflow-hidden z-10" style={{ backgroundColor: '#1A1B23', border: '1px solid rgba(255,255,255,0.1)' }}>
-                        {LIP_SYNC_LANGUAGES.map((lang) => (
-                          <button
-                            key={lang}
-                            onClick={() => handleLipSyncLangChange(lang)}
-                            className="w-full px-3 py-2.5 text-left text-xs transition-colors flex items-center justify-between"
-                            style={{ color: lipSyncLang === lang ? '#0066FF' : 'rgba(203,213,225,0.9)', fontWeight: lipSyncLang === lang ? 700 : 400 }}
-                            onMouseEnter={e => { if (lipSyncLang !== lang) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
-                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                          >
-                            {lang}
-                            {lipSyncLang === lang && <span className="material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* ASR Segmented list */}
-                <div className="relative flex flex-col gap-2.5">
-                  {/* Global translating overlay */}
-                  {lipSyncTranslating && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl" style={{ backgroundColor: 'rgba(17,17,20,0.7)', backdropFilter: 'blur(4px)' }} aria-live="polite">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: '#0066FF', borderTopColor: 'transparent' }}></div>
-                        <span className="text-sm font-medium" style={{ color: '#60a5fa' }}>翻译中…</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {lipSyncSegments.map((seg) => (
-                    <div
-                      key={seg.id}
-                      className="rounded-xl p-3 flex flex-col gap-2"
-                      style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-                    >
-                      {/* Time range + speaker */}
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[11px] font-medium transition-all"
-                          style={{
-                            backgroundColor: seg.refreshing ? 'rgba(0,240,255,0.1)' : 'rgba(255,255,255,0.06)',
-                            color: seg.refreshing ? '#00f0ff' : 'rgba(148,163,184,0.7)',
-                            border: `1px solid ${seg.refreshing ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                          }}
-                        >
-                          {seg.refreshing && (
-                            <span className="w-2.5 h-2.5 rounded-full border border-current animate-spin" style={{ borderTopColor: 'transparent' }}></span>
-                          )}
-                          {seg.timeRange}
-                        </span>
-                        <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>{seg.speaker}</span>
-                      </div>
-
-                      {/* Editable text + confirm button */}
-                      <div className="flex gap-2 items-start">
-                        <textarea
-                          value={seg.text}
-                          onChange={(e) => handleSegmentTextChange(seg.id, e.target.value)}
-                          disabled={lipSyncTranslating || seg.refreshing}
-                          rows={2}
-                          className="flex-1 rounded-lg text-sm p-2.5 resize-none outline-none transition-all leading-relaxed"
-                          style={{
-                            backgroundColor: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            color: 'rgba(203,213,225,0.9)',
-                            opacity: lipSyncTranslating || seg.refreshing ? 0.5 : 1,
-                          }}
-                          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,102,255,0.5)' }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
-                          aria-label={`${seg.timeRange} 讲话内容`}
-                        />
-                        <button
-                          onClick={() => handleSegmentConfirm(seg.id)}
-                          disabled={lipSyncTranslating || seg.refreshing}
-                          className="shrink-0 w-8 h-8 mt-0.5 rounded-lg flex items-center justify-center transition-all"
-                          style={{
-                            backgroundColor: seg.refreshing ? 'rgba(0,240,255,0.1)' : 'rgba(0,102,255,0.12)',
-                            border: `1px solid ${seg.refreshing ? 'rgba(0,240,255,0.4)' : 'rgba(0,102,255,0.3)'}`,
-                            color: seg.refreshing ? '#00f0ff' : '#60a5fa',
-                            opacity: lipSyncTranslating || seg.refreshing ? 0.5 : 1,
-                            cursor: lipSyncTranslating || seg.refreshing ? 'not-allowed' : 'pointer',
-                          }}
-                          aria-label="确认修改"
-                          title="确认修改，刷新时间轴"
-                        >
-                          <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }}></div>
-
-              {/* Section: 配音音色 */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">配音音色</span>
-                  <button
-                    className="flex items-center gap-0.5 text-xs font-medium transition-colors"
-                    style={{ color: '#0066FF' }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#3b82f6' }}
-                    onMouseLeave={e => { e.currentTarget.style.color = '#0066FF' }}
-                    aria-label="浏览更多音色"
-                  >
-                    更多音色
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">chevron_right</span>
-                  </button>
-                </div>
-
-                {/* Voice clone card (selected) */}
-                <div
-                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                  style={{ backgroundColor: 'rgba(0,102,255,0.07)', border: '2px solid #0066FF' }}
-                  role="radio"
-                  aria-checked="true"
-                  tabIndex={0}
-                >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: 'rgba(0,102,255,0.15)' }}>
-                    <span className="material-symbols-outlined text-lg" style={{ color: '#0066FF' }} aria-hidden="true">record_voice_over</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-white">视频原声</span>
-                    <span className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>Voice Cloning</span>
-                  </div>
-                  <div className="ml-auto shrink-0">
-                    <span className="material-symbols-outlined text-xl" style={{ color: '#0066FF', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal footer */}
-            <div className="flex items-center justify-between px-6 py-4 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              {/* Credits hint */}
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">stars</span>
-                <span className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>确认生成将消耗 <span className="font-bold text-purple-400">50 算力</span></span>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowLipSyncModal(false)}
-                  className="px-5 py-2 rounded-lg text-sm font-medium border transition-colors"
-                  style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.9)' }}
-                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
-                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleLipSyncConfirm}
-                  disabled={lipSyncTranslating}
-                  className="px-5 py-2 rounded-lg text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: '#0066FF', boxShadow: '0 4px 15px rgba(0,102,255,0.3)' }}
-                >
-                  确认生成
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══ Multimodal Confirm Modal ══ */}
-      {showMultimodalConfirmModal && (
-        <div
-          className="fixed inset-0 z-[20000] flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="multimodal-title"
-        >
-          <div
-            className="relative w-[440px] rounded-2xl overflow-hidden"
-            style={{ backgroundColor: '#111114', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: 'rgba(251,191,36,0.12)' }}>
-                  <span className="material-symbols-outlined text-base" style={{ color: '#fbbf24' }} aria-hidden="true">layers</span>
-                </div>
-                <h2 id="multimodal-title" className="text-base font-semibold text-white">视频多模态拆分</h2>
-              </div>
-              <button
-                onClick={() => setShowMultimodalConfirmModal(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                style={{ color: 'rgba(148,163,184,0.6)' }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                aria-label="关闭"
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">close</span>
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-5">
-              <p className="text-sm leading-relaxed" style={{ color: 'rgba(203,213,225,0.85)' }}>
-                该功能支持拆分选中视频中的<span className="font-semibold text-white">画面</span>、<span className="font-semibold text-white">背景音乐</span>、<span className="font-semibold text-white">人声</span>，便于您对视频进行编辑。
-              </p>
-              {/* Feature preview chips */}
-              <div className="flex gap-2 mt-4">
-                {[
-                  { icon: 'videocam', label: '画面轨道', color: '#fbbf24' },
-                  { icon: 'record_voice_over', label: '人声轨道', color: '#a78bfa' },
-                  { icon: 'music_note', label: 'BGM 轨道', color: '#f472b6' },
-                ].map(({ icon, label, color }) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(203,213,225,0.8)' }}
-                  >
-                    <span className="material-symbols-outlined text-sm" style={{ color }} aria-hidden="true">{icon}</span>
-                    {label}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              {/* Credits hint */}
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">stars</span>
-                <span className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>确认拆分将消耗 <span className="font-bold text-purple-400">50 算力</span></span>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowMultimodalConfirmModal(false)}
-                  className="px-5 py-2 rounded-lg text-sm font-medium border transition-colors"
-                  style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.9)' }}
-                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
-                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleMultimodalConfirm}
-                  className="px-5 py-2 rounded-lg text-sm font-bold text-white transition-all hover:brightness-110"
-                  style={{ backgroundColor: '#0066FF', boxShadow: '0 4px 15px rgba(0,102,255,0.3)' }}
-                >
-                  确认拆分
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -1963,6 +1557,217 @@ function ProfessionalEditPage() {
         </div>
       )}
 
+    </div>
+  )
+}
+
+// ══ LipSyncPanel ══
+function LipSegmentEditor({ seg, translating, onSegmentChange }: {
+  seg: { id: number; timeRange: string; speaker: string; text: string; refreshing?: boolean }
+  translating: boolean
+  onSegmentChange: (id: number, val: string) => void
+}) {
+  return (
+    <div className="rounded-xl p-2.5 flex flex-col gap-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="flex items-center gap-1.5">
+        <span className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ backgroundColor: seg.refreshing ? 'rgba(0,240,255,0.1)' : 'rgba(255,255,255,0.06)', color: seg.refreshing ? '#00f0ff' : 'rgba(148,163,184,0.7)', border: `1px solid ${seg.refreshing ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
+          {seg.timeRange}
+        </span>
+        <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{seg.speaker}</span>
+      </div>
+      <textarea
+        value={seg.text}
+        onChange={e => onSegmentChange(seg.id, e.target.value)}
+        disabled={translating}
+        rows={2}
+        className="w-full rounded-lg text-xs p-2 resize-none outline-none leading-relaxed bg-transparent"
+        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', opacity: translating ? 0.5 : 1 }}
+        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,102,255,0.5)' }}
+        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+      />
+    </div>
+  )
+}
+
+function LipSyncPanel({
+  stage, progress, lang, segments, translating, showLangDropdown, langDropdownRef,
+  onLangChange, onToggleLangDropdown, onSegmentChange,
+  onUndo, onRedo, canUndo, canRedo,
+  onStart, onClose,
+}: {
+  stage: LipSyncPanelStage
+  progress: number
+  lang: string
+  segments: AsrSegment[]
+  translating: boolean
+  showLangDropdown: boolean
+  langDropdownRef: React.RefObject<HTMLDivElement | null>
+  onLangChange: (lang: string) => void
+  onToggleLangDropdown: () => void
+  onSegmentChange: (id: number, text: string) => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
+  onStart: () => void
+  onClose: () => void
+}) {
+  const circumference = 2 * Math.PI * 28 // r=28
+
+  return (
+    <div className="flex-1 overflow-hidden flex flex-col">
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-base" style={{ color: '#00f0ff' }} aria-hidden="true">record_voice_over</span>
+          <span className="text-sm font-semibold text-white">视频对口型</span>
+        </div>
+        {stage === 'done' && (
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors" style={{ color: 'rgba(148,163,184,0.6)' }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }} aria-label="关闭">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
+          </button>
+        )}
+      </div>
+
+      {/* parsing */}
+      {stage === 'parsing' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
+            <circle
+              cx="36" cy="36" r="28" fill="none"
+              stroke="url(#lsGrad)" strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference * (1 - progress / 100)}
+              transform="rotate(-90 36 36)"
+              style={{ transition: 'stroke-dashoffset 0.2s ease' }}
+            />
+            <defs>
+              <linearGradient id="lsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#7000ff" />
+                <stop offset="100%" stopColor="#00f2ea" />
+              </linearGradient>
+            </defs>
+            <text x="36" y="40" textAnchor="middle" fontSize="12" fontWeight="700" fill="white">{Math.round(progress)}%</text>
+          </svg>
+          <p className="text-sm text-slate-400">视频解析中…</p>
+        </div>
+      )}
+
+      {/* editing */}
+      {stage === 'editing' && (
+        <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: 'none' }}>
+          {/* 解析完成 + 语言选择：水平并列 */}
+          <div className="mx-3 mt-3 mb-1 flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)' }}>
+              <span className="material-symbols-outlined text-sm" style={{ color: '#00f0ff', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
+              <span className="text-xs whitespace-nowrap" style={{ color: '#a5f3fc' }}>解析完成</span>
+            </div>
+            <button onClick={onUndo} disabled={!canUndo} title="撤回" className="flex items-center justify-center rounded transition-colors" style={{ width: '24px', height: '24px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: canUndo ? 'rgba(148,163,184,0.8)' : 'rgba(255,255,255,0.2)', cursor: canUndo ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>undo</span>
+            </button>
+            <button onClick={onRedo} disabled={!canRedo} title="重做" className="flex items-center justify-center rounded transition-colors" style={{ width: '24px', height: '24px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: canRedo ? 'rgba(148,163,184,0.8)' : 'rgba(255,255,255,0.2)', cursor: canRedo ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>redo</span>
+            </button>
+            <div ref={langDropdownRef} className="relative flex-1">
+              <button
+                onClick={onToggleLangDropdown}
+                className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{ backgroundColor: 'rgba(0,102,255,0.08)', border: '1px solid rgba(0,102,255,0.25)', color: '#60a5fa' }}
+                aria-expanded={showLangDropdown}
+              >
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">translate</span>
+                <span className="flex-1 text-left truncate">{lang}</span>
+                <span className="material-symbols-outlined text-xs" style={{ transform: showLangDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} aria-hidden="true">expand_more</span>
+              </button>
+              {showLangDropdown && (
+                <div className="absolute right-0 mt-1 w-28 rounded-lg shadow-2xl overflow-hidden z-50" style={{ backgroundColor: '#1A1B23', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {LIP_SYNC_LANGUAGES.map(l => (
+                    <button key={l} onClick={() => onLangChange(l)} className="w-full px-3 py-2.5 text-left text-xs transition-colors flex items-center justify-between" style={{ color: lang === l ? '#0066FF' : 'rgba(203,213,225,0.9)', fontWeight: lang === l ? 700 : 400 }} onMouseEnter={e => { if (lang !== l) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}>
+                      {l}
+                      {lang === l && <span className="material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 台词列表 */}
+          <div className="flex-1 px-3 pb-2 flex flex-col gap-2 relative">
+            {translating && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl" style={{ backgroundColor: 'rgba(10,10,11,0.7)', backdropFilter: 'blur(4px)' }} aria-live="polite">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#0066FF', borderTopColor: 'transparent' }} />
+                  <span className="text-xs" style={{ color: '#60a5fa' }}>翻译中…</span>
+                </div>
+              </div>
+            )}
+            {segments.map(seg => (
+              <LipSegmentEditor key={seg.id} seg={seg} translating={translating} onSegmentChange={onSegmentChange} />
+            ))}
+          </div>
+
+          {/* 底部操作栏 */}
+          <div className="shrink-0 px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-1.5 mb-2.5">
+              <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">stars</span>
+              <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.6)' }}>预计消耗 <span className="font-bold text-purple-400">50 算力</span></span>
+            </div>
+            <button
+              onClick={onStart}
+              disabled={translating}
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg,#7000ff,#0066FF)', boxShadow: '0 4px 14px rgba(0,102,255,0.3)' }}
+            >
+              开始对口型
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* generating */}
+      {stage === 'generating' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,rgba(112,0,255,0.2),rgba(0,242,234,0.2))', border: '1px solid rgba(0,240,255,0.25)' }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color: '#00f0ff' }} aria-hidden="true">record_voice_over</span>
+          </div>
+          <div className="w-full space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-white">对口型生成中…</span>
+              <span className="text-sm font-mono" style={{ color: '#00f0ff' }}>{Math.round(progress)}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7000ff,#00f2ea)', transition: 'width 0.35s ease' }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-center" style={{ color: 'rgba(148,163,184,0.5)' }}>可切换到其他面板继续工作，完成后自动替换 V1 轨道</p>
+        </div>
+      )}
+
+      {/* done */}
+      {stage === 'done' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)' }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color: '#00f0ff', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
+          </div>
+          <div className="text-center space-y-1.5">
+            <p className="text-base font-semibold text-white">生成完成 ✓</p>
+            <p className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>对口型视频已原地替换 V1 轨道</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-xl text-sm font-medium border transition-all hover:bg-white/5"
+            style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.9)' }}
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </div>
   )
 }
