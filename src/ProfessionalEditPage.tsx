@@ -4,9 +4,37 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTour } from './useTour'
 import { getMaterials, addMaterial, deleteMaterial, subscribe, type SharedSmartMaterial } from './smartMaterialsStore'
+import { isLipsyncEditOverThreshold, lipsyncEditDeviationRatio, LIPSYNC_EDIT_DEVIATION_THRESHOLD } from './lipsyncEditThreshold'
+import { lipsyncTargetLanguageList as LIPSYNC_TARGET_LANGUAGES } from './lipsyncLanguages'
 
-type SidebarTool = '我的素材' | '虚拟人' | '图片' | '配音' | '音乐' | '文本' | '转场' | '模板' | '贴纸' | '素材优化' | '对口型'
-type LipSyncPanelStage = 'parsing' | 'editing' | 'generating' | 'done'
+type SidebarTool = '我的素材' | '虚拟人' | '图片' | '配音' | '音乐' | '文本' | '转场' | '模板' | '贴纸' | '素材优化' | 'AI对口型'
+type LipSyncPanelStage = 'idle' | 'uploading' | 'parsing' | 'editing' | 'generating' | 'done'
+
+const LS_AI_LIPSYNC_KEY = 'iw-pro-editor-ai-lipsync'
+const LS_AI_LIPSYNC_CLIP_ID = 'clip01'
+type LsAiLipsync = { v: 1; clipId: string; phase: 'parse' | 'ready'; parseProgress?: number; background?: boolean }
+
+function readAiLipsyncLs(): LsAiLipsync | null {
+  try {
+    const raw = localStorage.getItem(LS_AI_LIPSYNC_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw) as LsAiLipsync
+    if (d.v !== 1 || d.clipId !== LS_AI_LIPSYNC_CLIP_ID) return null
+    return d
+  } catch {
+    return null
+  }
+}
+function writeAiLipsyncLs(p: LsAiLipsync) {
+  try {
+    localStorage.setItem(LS_AI_LIPSYNC_KEY, JSON.stringify(p))
+  } catch { /* ignore */ }
+}
+function clearAiLipsyncLs() {
+  try {
+    localStorage.removeItem(LS_AI_LIPSYNC_KEY)
+  } catch { /* ignore */ }
+}
 type OptimizeTab = '素材更换' | '素材编辑' | '动画效果'
 type OptimizeReplaceSubTab = '图片生成' | '视频生成'
 type AnimSubTab = '入场动画' | '出场动画'
@@ -75,8 +103,6 @@ const MODEL_ICONS: Record<VideoModel, string> = {
 
 type SmartMaterial = SharedSmartMaterial
 
-const LIP_SYNC_LANGUAGES = ['中文', '英语', '日语', '韩语', '俄语']
-
 type AsrSegment = {
   id: number
   timeRange: string
@@ -86,30 +112,45 @@ type AsrSegment = {
 }
 
 const LIP_SYNC_SEGMENT_TRANSLATIONS: Record<string, AsrSegment[]> = {
-  '中文': [
+  '中文 · ZH': [
     { id: 1, timeRange: '00:00 - 00:03', speaker: '讲话人01', text: '欢迎来到讯飞智作，我们的 AI 视频创作平台', refreshing: false },
     { id: 2, timeRange: '00:03 - 00:08', speaker: '讲话人01', text: '让您轻松打造专业级内容，高效完成品牌宣传视频制作。', refreshing: false },
     { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: '感谢您选择讯飞智作，让我们开始创作吧！', refreshing: false },
   ],
-  '英语': [
+  '英语 · EN': [
     { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: 'Welcome to Xunfei Zhizuo, our AI video creation platform', refreshing: false },
     { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: 'helps you easily craft professional-grade content', refreshing: false },
     { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: 'and efficiently produce brand promotional videos.', refreshing: false },
   ],
-  '日语': [
+  '日语 · JA': [
     { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: '讯飞智作へようこそ。AI ビデオ制作プラットフォームで', refreshing: false },
     { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: 'プロ品質のコンテンツを簡単に作成し', refreshing: false },
     { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: 'ブランドプロモーション動画を効率的に制作できます。', refreshing: false },
   ],
-  '韩语': [
+  '韩语 · KO': [
     { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: '讯飞智作에 오신 것을 환영합니다', refreshing: false },
     { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: 'AI 영상 제작 플랫폼으로 전문적인 콘텐츠를 쉽게 제작하고', refreshing: false },
     { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: '브랜드 홍보 영상을 효율적으로 완성할 수 있습니다。', refreshing: false },
   ],
-  '俄语': [
+  '俄语 · RU': [
     { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: 'Добро пожаловать в Xunfei Zhizuo', refreshing: false },
     { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: 'Наша AI-платформа поможет вам легко создавать профессиональный контент', refreshing: false },
     { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: 'и эффективно производить рекламные ролики для вашего бренда.', refreshing: false },
+  ],
+  '阿拉伯语 · AR': [
+    { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: 'مرحبًا بكم في شيونفيهي جيزو، منصة إنشاء الفيديو بالذكاء الاصطناعي.', refreshing: false },
+    { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: 'نساعدك على إنشاء محتوى احترافي بسهولة، وإنتاج فيديوهات ترويجية للعلامة التجارية بكفاءة.', refreshing: false },
+    { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: 'شكرًا لاختياركم شيونفيهي جيزو، ولنبدأ الإبداع!', refreshing: false },
+  ],
+  '西班牙语 · ES': [
+    { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: 'Bienvenido a Xunfei Zhizuo, nuestra plataforma de creación de vídeo con IA.', refreshing: false },
+    { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: 'Le ayuda a crear contenido de nivel profesional con facilidad y a producir vídeos promocionales de marca de forma eficiente.', refreshing: false },
+    { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: 'Gracias por elegir Xunfei Zhizuo. ¡Comencemos a crear!', refreshing: false },
+  ],
+  '粤语 · YUE': [
+    { id: 1, timeRange: '00:00 - 00:04', speaker: '讲话人01', text: '歡迎嚟到訊飛智作，我哋嘅 AI 影片創作平台。', refreshing: false },
+    { id: 2, timeRange: '00:04 - 00:08', speaker: '讲话人01', text: '等你輕鬆打造專業級內容，高效完成品牌宣傳片製作。', refreshing: false },
+    { id: 3, timeRange: '00:08 - 00:12', speaker: '讲话人01', text: '多謝你揀訊飛智作，一齊開始創作啦！', refreshing: false },
   ],
 }
 
@@ -204,11 +245,16 @@ function ProfessionalEditPage() {
 
   // ── Lip sync panel ──
   const [hasLipSyncPanel, setHasLipSyncPanel] = useState(false)
-  const [lipSyncPanelStage, setLipSyncPanelStage] = useState<LipSyncPanelStage>('parsing')
+  const [lipSyncPanelStage, setLipSyncPanelStage] = useState<LipSyncPanelStage>('idle')
+  const [lipSyncUploadProgress, setLipSyncUploadProgress] = useState(0)
   const [lipSyncProgress, setLipSyncProgress] = useState(0)
-  const [lipSyncLang, setLipSyncLang] = useState('中文')
-  const [lipSyncSegments, setLipSyncSegments] = useState<AsrSegment[]>(LIP_SYNC_SEGMENT_TRANSLATIONS['中文'])
-  const [segHistory, setSegHistory] = useState<AsrSegment[][]>([LIP_SYNC_SEGMENT_TRANSLATIONS['中文']])
+  const [lipSyncBackgroundParsing, setLipSyncBackgroundParsing] = useState(false)
+  const lipSyncBgParsingRef = useRef(false)
+  useEffect(() => { lipSyncBgParsingRef.current = lipSyncBackgroundParsing }, [lipSyncBackgroundParsing])
+  const defaultLipLang = '中文 · ZH'
+  const [lipSyncLang, setLipSyncLang] = useState(defaultLipLang)
+  const [lipSyncSegments, setLipSyncSegments] = useState<AsrSegment[]>(LIP_SYNC_SEGMENT_TRANSLATIONS[defaultLipLang])
+  const [segHistory, setSegHistory] = useState<AsrSegment[][]>([LIP_SYNC_SEGMENT_TRANSLATIONS[defaultLipLang]])
   const [segHistIdx, setSegHistIdx] = useState(0)
   const [lipSyncTranslating, setLipSyncTranslating] = useState(false)
   const [showLipSyncLangDropdown, setShowLipSyncLangDropdown] = useState(false)
@@ -248,7 +294,7 @@ function ProfessionalEditPage() {
 
   // ── Tour: open context-menu programmatically (used by tour next-override) ──
   const openContextMenuForTour = useCallback(() => {
-    if (clip01ChipRef.current && !clip01Loading) {
+    if (clip01ChipRef.current && !clip01Loading && lipSyncPanelStage !== 'uploading') {
       const rect = clip01ChipRef.current.getBoundingClientRect()
       setContextMenu({
         top: rect.top,
@@ -256,7 +302,7 @@ function ProfessionalEditPage() {
         clipId: 'main1',
       })
     }
-  }, [clip01Loading])
+  }, [clip01Loading, lipSyncPanelStage])
   // Init optimize panel params when track selection changes
   useEffect(() => {
     if (selectedTrack) {
@@ -342,20 +388,74 @@ function ProfessionalEditPage() {
   )
 
 
-  // parsing 自动跳转 editing
+  // 刷新页面：恢复后台解析 / 解析完成态（本地持久化）
+  useEffect(() => {
+    const d = readAiLipsyncLs()
+    if (!d) return
+    if (d.phase === 'parse') {
+      setHasLipSyncPanel(true)
+      setLipSyncPanelStage('parsing')
+      setLipSyncProgress(typeof d.parseProgress === 'number' ? d.parseProgress : 0)
+      setLipSyncBackgroundParsing(!!d.background)
+    } else if (d.phase === 'ready') {
+      setHasLipSyncPanel(true)
+      setLipSyncPanelStage('editing')
+      setLipSyncBackgroundParsing(false)
+    }
+  }, [])
+
+  // 上传中 → 解析中
+  useEffect(() => {
+    if (lipSyncPanelStage !== 'uploading') return
+    let p = 0
+    const iv = setInterval(() => {
+      p += Math.random() * 12 + 8
+      if (p >= 100) {
+        clearInterval(iv)
+        setLipSyncUploadProgress(100)
+        setLipSyncPanelStage('parsing')
+        setLipSyncProgress(0)
+        writeAiLipsyncLs({ v: 1, clipId: LS_AI_LIPSYNC_CLIP_ID, phase: 'parse', parseProgress: 0, background: false })
+      } else {
+        setLipSyncUploadProgress(p)
+      }
+    }, 150)
+    return () => clearInterval(iv)
+  }, [lipSyncPanelStage])
+
+  // 解析中 → 编辑（进度写入 localStorage，支持后台解析与刷新）
   useEffect(() => {
     if (lipSyncPanelStage !== 'parsing') return
-    let prog = 0
-    const interval = setInterval(() => {
-      prog += Math.random() * 15 + 10
-      if (prog >= 100) {
-        clearInterval(interval)
-        setLipSyncPanelStage('editing')
-      } else {
-        setLipSyncProgress(prog)
-      }
+    let cancelled = false
+    const iv = setInterval(() => {
+      if (cancelled) return
+      setLipSyncProgress(prev => {
+        if (prev >= 100) {
+          writeAiLipsyncLs({ v: 1, clipId: LS_AI_LIPSYNC_CLIP_ID, phase: 'ready', background: false })
+          cancelled = true
+          clearInterval(iv)
+          queueMicrotask(() => {
+            setLipSyncPanelStage('editing')
+            setLipSyncBackgroundParsing(false)
+          })
+          return 100
+        }
+        const n = Math.min(100, prev + Math.random() * 15 + 10)
+        if (n >= 100) {
+          writeAiLipsyncLs({ v: 1, clipId: LS_AI_LIPSYNC_CLIP_ID, phase: 'ready', background: false })
+          cancelled = true
+          clearInterval(iv)
+          queueMicrotask(() => {
+            setLipSyncPanelStage('editing')
+            setLipSyncBackgroundParsing(false)
+          })
+          return 100
+        }
+        writeAiLipsyncLs({ v: 1, clipId: LS_AI_LIPSYNC_CLIP_ID, phase: 'parse', parseProgress: n, background: lipSyncBgParsingRef.current })
+        return n
+      })
     }, 200)
-    return () => clearInterval(interval)
+    return () => { cancelled = true; clearInterval(iv) }
   }, [lipSyncPanelStage])
 
   // Close popovers on outside click
@@ -428,18 +528,82 @@ function ProfessionalEditPage() {
     }
   }
 
+  const applyAiLipSyncEntry = useCallback(() => {
+    if (hasLipSyncDone) {
+      setLipSyncPanelStage('editing')
+      setLipSyncBackgroundParsing(false)
+      return
+    }
+    if (lipSyncPanelStage === 'uploading' || lipSyncPanelStage === 'parsing' || lipSyncPanelStage === 'generating') {
+      return
+    }
+    if (lipSyncPanelStage === 'editing' || lipSyncPanelStage === 'done') {
+      return
+    }
+    const d = readAiLipsyncLs()
+    if (d?.phase === 'parse') {
+      setLipSyncPanelStage('parsing')
+      setLipSyncProgress(typeof d.parseProgress === 'number' ? d.parseProgress : 0)
+      setLipSyncBackgroundParsing(!!d.background)
+      return
+    }
+    if (d?.phase === 'ready') {
+      setLipSyncPanelStage('editing')
+      setLipSyncBackgroundParsing(false)
+      return
+    }
+    clearAiLipsyncLs()
+    setLipSyncPanelStage('uploading')
+    setLipSyncUploadProgress(0)
+  }, [hasLipSyncDone, lipSyncPanelStage])
+
   const handleOpenLipSync = () => {
     setContextMenu(null)
     setHasLipSyncPanel(true)
-    setActiveTool('对口型')
-    if (hasLipSyncDone) {
-      // 已完成过对口型，直接进入编辑台词
-      setLipSyncPanelStage('editing')
-    } else {
-      setLipSyncPanelStage('parsing')
-      setLipSyncProgress(0)
-    }
+    setActiveTool('AI对口型')
+    applyAiLipSyncEntry()
   }
+
+  const handleReplaceTrack = () => {
+    setContextMenu(null)
+    setHasLipSyncDone(false)
+    setLipSyncPanelStage('idle')
+    setLipSyncProgress(0)
+    setHasLipSyncPanel(false)
+    setActiveTool('我的素材')
+    showToast('V1 轨道已替换为 AI 对口型视频')
+  }
+
+  const handleReEdit = () => {
+    setLipSyncPanelStage('editing')
+  }
+
+  const cancelLipSyncUpload = useCallback(() => {
+    setLipSyncPanelStage('idle')
+    setLipSyncUploadProgress(0)
+    setActiveTool('我的素材')
+    clearAiLipsyncLs()
+  }, [])
+
+  const cancelLipSyncParse = useCallback(() => {
+    setLipSyncPanelStage('idle')
+    setLipSyncProgress(0)
+    setLipSyncBackgroundParsing(false)
+    setActiveTool('我的素材')
+    clearAiLipsyncLs()
+  }, [])
+
+  const lipSyncParseToBackground = useCallback(() => {
+    setLipSyncBackgroundParsing(true)
+    writeAiLipsyncLs({
+      v: 1,
+      clipId: LS_AI_LIPSYNC_CLIP_ID,
+      phase: 'parse',
+      parseProgress: lipSyncProgress,
+      background: true,
+    })
+    setActiveTool('我的素材')
+  }, [lipSyncProgress])
 
   // ── Lip sync handlers ──
   const handleLipSyncLangChange = (lang: string) => {
@@ -447,7 +611,7 @@ function ProfessionalEditPage() {
     setShowLipSyncLangDropdown(false)
     setLipSyncTranslating(true)
     setTimeout(() => {
-      setLipSyncSegments(LIP_SYNC_SEGMENT_TRANSLATIONS[lang])
+      setLipSyncSegments(LIP_SYNC_SEGMENT_TRANSLATIONS[lang] ?? LIP_SYNC_SEGMENT_TRANSLATIONS[defaultLipLang])
       setLipSyncTranslating(false)
     }, 1500)
   }
@@ -473,7 +637,7 @@ function ProfessionalEditPage() {
     setLipSyncSegments(segHistory[ni])
   }
 
-const handleLipSyncStart = () => {
+  const handleLipSyncStart = () => {
     setLipSyncPanelStage('generating')
     setLipSyncProgress(0)
     setClip01Loading(true)
@@ -488,7 +652,8 @@ const handleLipSyncStart = () => {
         setClip01Loading(false)
         setHasLipSyncDone(true)
         setLipSyncPanelStage('done')
-        showToast('对口型视频已生成，已替换 V1 轨道')
+        clearAiLipsyncLs()
+        showToast('AI对口型已生成完成，右键轨道片段可一键替换')
       } else {
         setLipSyncProgress(prog)
       }
@@ -1147,24 +1312,24 @@ const handleLipSyncStart = () => {
                 </>
               )
             })()}
-            {/* ── 对口型 (appears after first trigger) ── */}
+            {/* ── AI对口型 (appears after first trigger) ── */}
             {hasLipSyncPanel && (() => {
-              const active = activeTool === '对口型'
+              const active = activeTool === 'AI对口型'
               return (
                 <>
                   <div className="mx-2 my-1" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
                   <button
-                    onClick={() => setActiveTool('对口型')}
+                    onClick={() => { setHasLipSyncPanel(true); setActiveTool('AI对口型'); applyAiLipSyncEntry() }}
                     className="relative flex flex-col items-center gap-0.5 cursor-pointer transition-colors py-2.5 w-full shrink-0"
                     style={{ color: active ? '#00f0ff' : 'rgba(0,240,255,0.45)', borderLeft: active ? '2px solid #00f0ff' : '2px solid transparent', backgroundColor: active ? 'rgba(0,240,255,0.06)' : 'transparent' }}
-                    aria-label="对口型"
+                    aria-label="AI对口型"
                     aria-pressed={active}
                   >
                     <div className="relative">
                       <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>record_voice_over</span>
                       <span className="absolute -top-1 -right-2 text-[7px] font-black px-0.5 rounded" style={{ background: 'linear-gradient(135deg,#7000ff,#00f2ea)', color: 'white', lineHeight: '1.4' }}>AI</span>
                     </div>
-                    <span className="text-[9px] leading-tight text-center">对口型</span>
+                    <span className="text-[9px] leading-tight text-center px-0.5">AI对口型</span>
                   </button>
                 </>
               )
@@ -1178,9 +1343,10 @@ const handleLipSyncStart = () => {
 
             {/* ── Left Panel (resizable) ── */}
             <aside id="tour-material-panel" className="flex flex-col border-r shrink-0 overflow-hidden relative" style={{ width: `${leftPanelWidth}px`, backgroundColor: '#0A0A0B', borderColor: '#222226' }}>
-              {activeTool === '对口型' ? (
+              {activeTool === 'AI对口型' ? (
                 <LipSyncPanel
                   stage={lipSyncPanelStage}
+                  uploadProgress={lipSyncUploadProgress}
                   progress={lipSyncProgress}
                   lang={lipSyncLang}
                   segments={lipSyncSegments}
@@ -1195,6 +1361,11 @@ const handleLipSyncStart = () => {
                   canUndo={segHistIdx > 0}
                   canRedo={segHistIdx < segHistory.length - 1}
                   onStart={handleLipSyncStart}
+                  onCancelUpload={cancelLipSyncUpload}
+                  onCancelParse={cancelLipSyncParse}
+                  onBackgroundParse={lipSyncParseToBackground}
+                  onReplaceTrack={handleReplaceTrack}
+                  onReEdit={handleReEdit}
                   onClose={() => { setActiveTool('我的素材') }}
                 />
               ) : activeTool === '素材优化' && selectedTrack ? (
@@ -1288,21 +1459,59 @@ const handleLipSyncStart = () => {
                     top: '2px',
                     backgroundColor: hasLipSyncDone ? 'rgba(0,240,255,0.12)' : 'rgba(0,102,255,0.2)',
                     borderLeft: `2px solid ${hasLipSyncDone ? 'rgba(0,240,255,0.8)' : '#0066FF'}`,
-                    cursor: clip01Loading ? 'not-allowed' : 'pointer',
+                    cursor: clip01Loading || lipSyncPanelStage === 'uploading' ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.4s, border-color 0.4s',
                     outline: selectedTrack?.id === 'clip01' ? '2px solid #0066FF' : 'none',
                     outlineOffset: '1px',
                   }}
-                  onClick={() => { if (!clip01Loading) { setSelectedTrack(TRACK_CLIPS[0]); setActiveTool('素材优化'); setOptimizeTab('素材更换') } }}
+                  onClick={() => { if (!clip01Loading && lipSyncPanelStage !== 'uploading') { setSelectedTrack(TRACK_CLIPS[0]); setActiveTool('素材优化'); setOptimizeTab('素材更换') } }}
                   onContextMenu={handleClip01ContextMenu}
-                  title={clip01Loading ? '对口型生成中，暂不可操作' : '点击选中，右键查看操作'}
+                  title={
+                    clip01Loading ? 'AI对口型生成中，暂不可操作'
+                      : lipSyncPanelStage === 'uploading' ? '上传视频中…'
+                        : lipSyncPanelStage === 'parsing' ? '视频解析中…'
+                          : '点击选中，右键查看操作'
+                  }
                 >
                   <div className="w-10 h-full opacity-50 rounded shrink-0" style={{ backgroundColor: hasLipSyncDone ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.1)' }}></div>
                   <span className="text-[10px] truncate flex-1" style={{ color: hasLipSyncDone ? '#a5f3fc' : '#93c5fd' }}>
-                    {hasLipSyncDone ? 'Clip_01（对口型）.mp4' : 'Clip_01.mp4'}
+                    {hasLipSyncDone ? 'Clip_01（AI对口型）.mp4' : 'Clip_01.mp4'}
                   </span>
                   {hasLipSyncDone && !clip01Loading && (
-                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,240,255,0.2)', color: '#00f0ff' }}>对口型</span>
+                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,240,255,0.2)', color: '#00f0ff' }}>AI对口型</span>
+                  )}
+                  {!hasLipSyncDone && !clip01Loading && lipSyncPanelStage === 'editing' && (
+                    <span className="ml-auto shrink-0 text-[8px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(34,197,94,0.2)', color: '#86efac' }}>解析完成</span>
+                  )}
+                  {lipSyncPanelStage === 'uploading' && !clip01Loading && (
+                    <div className="absolute inset-0 rounded overflow-hidden" aria-live="polite">
+                      <div
+                        className="absolute inset-y-0 left-0 transition-all"
+                        style={{
+                          width: `${lipSyncUploadProgress}%`,
+                          background: 'linear-gradient(90deg,rgba(0,102,255,0.5),rgba(0,242,234,0.35))',
+                          transition: 'width 0.12s ease',
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[9px] font-medium" style={{ color: '#e0f7ff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>上传中 {Math.round(lipSyncUploadProgress)}%</span>
+                      </div>
+                    </div>
+                  )}
+                  {lipSyncPanelStage === 'parsing' && !clip01Loading && (
+                    <div className="absolute inset-0 rounded overflow-hidden pointer-events-none" aria-live="polite">
+                      <div
+                        className="absolute inset-y-0 left-0 transition-all"
+                        style={{
+                          width: `${lipSyncProgress}%`,
+                          background: 'linear-gradient(90deg,rgba(112,0,255,0.4),rgba(0,242,234,0.35))',
+                          transition: 'width 0.2s ease',
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[9px] font-medium" style={{ color: '#e0f7ff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>解析中 {Math.round(lipSyncProgress)}%</span>
+                      </div>
+                    </div>
                   )}
                   {/* Generating progress overlay */}
                   {clip01Loading && lipSyncPanelStage === 'generating' && (
@@ -1316,7 +1525,17 @@ const handleLipSyncStart = () => {
                         }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[9px] font-medium" style={{ color: '#e0f7ff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>对口型中 {Math.round(lipSyncProgress)}%</span>
+                        <span className="text-[9px] font-medium" style={{ color: '#e0f7ff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>AI对口型中 {Math.round(lipSyncProgress)}%</span>
+                      </div>
+                    </div>
+                  )}
+                  {/* Done overlay — stays visible until user replaces track */}
+                  {hasLipSyncDone && !clip01Loading && lipSyncPanelStage === 'done' && (
+                    <div className="absolute inset-0 rounded overflow-hidden pointer-events-none" aria-live="polite">
+                      <div className="absolute inset-y-0 left-0 w-full" style={{ background: 'linear-gradient(90deg,rgba(0,240,255,0.18),rgba(0,102,255,0.12))' }} />
+                      <div className="absolute inset-0 flex items-center justify-center gap-1">
+                        <span className="material-symbols-outlined" style={{ fontSize: '11px', color: '#00f0ff', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
+                        <span className="text-[9px] font-semibold" style={{ color: '#00f0ff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>100% 生成完成</span>
                       </div>
                     </div>
                   )}
@@ -1422,18 +1641,45 @@ const handleLipSyncStart = () => {
           {/* Divider */}
           <div className="my-1 mx-3" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }}></div>
 
-          <button
-            id="ctx-menu-lip-sync"
-            onClick={handleOpenLipSync}
-            role="menuitem"
-            className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-            style={{ color: 'rgba(0,240,255,0.9)' }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(0,240,255,0.07)' }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-          >
-            <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(0,240,255,0.7)' }} aria-hidden="true">record_voice_over</span>
-            视频人物对口型
-          </button>
+          {hasLipSyncDone ? (
+            <>
+              <button
+                onClick={() => { setContextMenu(null); setHasLipSyncPanel(true); setActiveTool('AI对口型') }}
+                role="menuitem"
+                className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                style={{ color: 'rgba(0,240,255,0.9)' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(0,240,255,0.07)' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(0,240,255,0.7)' }} aria-hidden="true">task_alt</span>
+                查看生成任务
+              </button>
+              <button
+                onClick={handleReplaceTrack}
+                role="menuitem"
+                className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                style={{ color: 'rgba(0,240,255,0.9)' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(0,240,255,0.07)' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(0,240,255,0.7)' }} aria-hidden="true">swap_horiz</span>
+                一键替换轨道
+              </button>
+            </>
+          ) : (
+            <button
+              id="ctx-menu-lip-sync"
+              onClick={handleOpenLipSync}
+              role="menuitem"
+              className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+              style={{ color: 'rgba(0,240,255,0.9)' }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(0,240,255,0.07)' }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+            >
+              <span className="material-symbols-outlined text-base shrink-0" style={{ color: 'rgba(0,240,255,0.7)' }} aria-hidden="true">record_voice_over</span>
+              AI对口型
+            </button>
+          )}
         </div>
       )}
 
@@ -1567,35 +1813,217 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
   translating: boolean
   onSegmentChange: (id: number, val: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(seg.text)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (translating) setEditing(false)
+  }, [translating])
+
+  useEffect(() => {
+    if (!editing) setDraft(seg.text)
+  }, [seg.text, seg.id, editing])
+
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus()
+  }, [editing])
+
+  const over = isLipsyncEditOverThreshold(seg.text, draft)
+  const noChange = draft === seg.text
+  const saveDisabled = noChange || over
+
+  const startEdit = () => {
+    if (translating) return
+    setDraft(seg.text)
+    setEditing(true)
+  }
+
+  const save = () => {
+    if (saveDisabled) return
+    onSegmentChange(seg.id, draft)
+    setEditing(false)
+  }
+
+  const cancel = () => {
+    setDraft(seg.text)
+    setEditing(false)
+  }
+
   return (
-    <div className="rounded-xl p-2.5 flex flex-col gap-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className="rounded-xl p-2.5 flex flex-col gap-1.5 lipsync-pro-seg-card" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
       <div className="flex items-center gap-1.5">
         <span className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ backgroundColor: seg.refreshing ? 'rgba(0,240,255,0.1)' : 'rgba(255,255,255,0.06)', color: seg.refreshing ? '#00f0ff' : 'rgba(148,163,184,0.7)', border: `1px solid ${seg.refreshing ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
           {seg.timeRange}
         </span>
         <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{seg.speaker}</span>
       </div>
-      <textarea
-        value={seg.text}
-        onChange={e => onSegmentChange(seg.id, e.target.value)}
-        disabled={translating}
-        rows={2}
-        className="w-full rounded-lg text-xs p-2 resize-none outline-none leading-relaxed bg-transparent"
-        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', opacity: translating ? 0.5 : 1 }}
-        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,102,255,0.5)' }}
-        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
-      />
+      {!editing ? (
+        <button
+          type="button"
+          onClick={startEdit}
+          disabled={translating}
+          className="w-full rounded-lg text-xs p-2 text-left leading-relaxed transition-colors disabled:opacity-50"
+          style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', background: 'transparent', cursor: translating ? 'not-allowed' : 'pointer' }}
+        >
+          {seg.text}
+        </button>
+      ) : (
+        <>
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            disabled={translating}
+            rows={3}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!saveDisabled) save() }
+              if (e.key === 'Escape') cancel()
+            }}
+            className="w-full rounded-lg text-xs p-2 resize-none outline-none leading-relaxed bg-transparent"
+            style={{ border: '1px solid rgba(0,102,255,0.45)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', opacity: translating ? 0.5 : 1 }}
+          />
+          {over && (
+            <p className="text-[10px] leading-relaxed px-0.5" style={{ color: 'rgba(251,191,36,0.95)' }}>
+              修改幅度已超过 {Math.round(LIPSYNC_EDIT_DEVIATION_THRESHOLD * 100)}%（当前约 {Math.round(lipsyncEditDeviationRatio(seg.text, draft) * 100)}%），可能影响口型效果。<b>无法保存</b>，请精简改写或分段处理。
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saveDisabled || translating}
+              className="px-3 py-1 rounded-lg text-[10px] font-semibold transition-opacity disabled:opacity-45 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg,#7000ff,#0066FF)', color: '#fff', border: 'none' }}
+            >保存</button>
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={translating}
+              className="px-3 py-1 rounded-lg text-[10px] font-medium border transition-colors"
+              style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.85)', background: 'transparent' }}
+            >取消</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function LipSyncDonePanel({ onReplaceTrack, onReEdit }: { onReplaceTrack: () => void; onReEdit: () => void }) {
+  const [playing, setPlaying] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  const togglePlay = () => {
+    if (!videoRef.current) return
+    if (playing) { videoRef.current.pause(); setPlaying(false) }
+    else { videoRef.current.play(); setPlaying(true) }
+  }
+
+  const handleDownload = () => {
+    const a = document.createElement('a')
+    a.href = 'https://www.w3schools.com/html/mov_bbb.mp4'
+    a.download = 'lipsync_result.mp4'
+    a.click()
+  }
+
+  const handleFullscreen = () => {
+    if (videoRef.current?.requestFullscreen) videoRef.current.requestFullscreen()
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-4" style={{ scrollbarWidth: 'none' }}>
+      {/* 完成标识 */}
+      <div className="flex items-center gap-2 px-1">
+        <span className="material-symbols-outlined text-base shrink-0" style={{ color: '#00f0ff', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
+        <span className="text-sm font-semibold text-white">生成完成</span>
+        <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(0,240,255,0.12)', color: '#00f0ff', border: '1px solid rgba(0,240,255,0.25)' }}>AI 对口型</span>
+      </div>
+
+      {/* 视频预览区 */}
+      <div className="relative rounded-xl overflow-hidden shrink-0" style={{ backgroundColor: '#000', border: '1px solid rgba(255,255,255,0.08)', aspectRatio: '16/9' }}>
+        <video
+          ref={videoRef}
+          src="https://www.w3schools.com/html/mov_bbb.mp4"
+          className="w-full h-full object-contain"
+          loop
+          playsInline
+          onEnded={() => setPlaying(false)}
+        />
+        {/* 播放/暂停中心按钮 */}
+        <button
+          onClick={togglePlay}
+          className="absolute inset-0 flex items-center justify-center group"
+          aria-label={playing ? '暂停' : '播放'}
+          style={{ background: 'transparent' }}
+        >
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+            style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', opacity: playing ? 0 : 1 }}
+          >
+            <span className="material-symbols-outlined text-white" style={{ fontSize: '26px', marginLeft: playing ? 0 : '2px' }} aria-hidden="true">
+              {playing ? 'pause' : 'play_arrow'}
+            </span>
+          </div>
+        </button>
+        {/* 工具栏 */}
+        <div
+          className="absolute bottom-0 left-0 right-0 flex items-center justify-end gap-1 px-2 py-1.5"
+          style={{ background: 'linear-gradient(transparent,rgba(0,0,0,0.7))' }}
+        >
+          <button
+            onClick={togglePlay}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+            aria-label={playing ? '暂停' : '播放'}
+          >
+            <span className="material-symbols-outlined text-white" style={{ fontSize: '16px' }} aria-hidden="true">{playing ? 'pause' : 'play_arrow'}</span>
+          </button>
+          <button
+            onClick={handleDownload}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+            aria-label="下载"
+          >
+            <span className="material-symbols-outlined text-white" style={{ fontSize: '16px' }} aria-hidden="true">download</span>
+          </button>
+          <button
+            onClick={handleFullscreen}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+            aria-label="全屏"
+          >
+            <span className="material-symbols-outlined text-white" style={{ fontSize: '16px' }} aria-hidden="true">fullscreen</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 操作按钮 */}
+      <div className="flex flex-col gap-2.5 shrink-0">
+        <button
+          onClick={onReplaceTrack}
+          className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110"
+          style={{ background: 'linear-gradient(135deg,#7000ff,#0066FF)', boxShadow: '0 4px 14px rgba(0,102,255,0.35)' }}
+        >
+          一键替换轨道
+        </button>
+        <button
+          onClick={onReEdit}
+          className="w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:bg-white/5"
+          style={{ borderColor: 'rgba(255,255,255,0.18)', color: 'rgba(203,213,225,0.9)' }}
+        >
+          重新编辑
+        </button>
+      </div>
     </div>
   )
 }
 
 function LipSyncPanel({
-  stage, progress, lang, segments, translating, showLangDropdown, langDropdownRef,
+  stage, uploadProgress, progress, lang, segments, translating, showLangDropdown, langDropdownRef,
   onLangChange, onToggleLangDropdown, onSegmentChange,
   onUndo, onRedo, canUndo, canRedo,
-  onStart, onClose,
+  onStart, onCancelUpload, onCancelParse, onBackgroundParse, onReplaceTrack, onReEdit, onClose,
 }: {
   stage: LipSyncPanelStage
+  uploadProgress: number
   progress: number
   lang: string
   segments: AsrSegment[]
@@ -1610,6 +2038,11 @@ function LipSyncPanel({
   canUndo: boolean
   canRedo: boolean
   onStart: () => void
+  onCancelUpload: () => void
+  onCancelParse: () => void
+  onBackgroundParse: () => void
+  onReplaceTrack: () => void
+  onReEdit: () => void
   onClose: () => void
 }) {
   const circumference = 2 * Math.PI * 28 // r=28
@@ -1620,7 +2053,7 @@ function LipSyncPanel({
       <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-base" style={{ color: '#00f0ff' }} aria-hidden="true">record_voice_over</span>
-          <span className="text-sm font-semibold text-white">视频对口型</span>
+          <span className="text-sm font-semibold text-white">AI对口型</span>
         </div>
         {stage === 'done' && (
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors" style={{ color: 'rgba(148,163,184,0.6)' }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }} aria-label="关闭">
@@ -1629,14 +2062,44 @@ function LipSyncPanel({
         )}
       </div>
 
+      {stage === 'idle' && (
+        <div className="flex-1 flex items-center justify-center px-6 text-center text-xs" style={{ color: 'rgba(148,163,184,0.55)' }}>从时间轴右键菜单进入 AI对口型 以开始上传</div>
+      )}
+
+      {/* uploading */}
+      {stage === 'uploading' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
+          <div className="w-full max-w-[220px] space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-white">上传视频中…</span>
+              <span className="text-sm font-mono" style={{ color: '#00f0ff' }}>{Math.round(uploadProgress)}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${uploadProgress}%`, background: 'linear-gradient(90deg,#0066FF,#00f2ea)', transition: 'width 0.12s ease' }}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelUpload}
+            className="px-5 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
+            style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.95)' }}
+          >
+            取消
+          </button>
+        </div>
+      )}
+
       {/* parsing */}
       {stage === 'parsing' && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 pb-6 min-h-0">
           <svg width="72" height="72" viewBox="0 0 72 72">
             <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
             <circle
               cx="36" cy="36" r="28" fill="none"
-              stroke="url(#lsGrad)" strokeWidth="5"
+              stroke="url(#lsGradPro)" strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={circumference * (1 - progress / 100)}
@@ -1644,7 +2107,7 @@ function LipSyncPanel({
               style={{ transition: 'stroke-dashoffset 0.2s ease' }}
             />
             <defs>
-              <linearGradient id="lsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id="lsGradPro" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#7000ff" />
                 <stop offset="100%" stopColor="#00f2ea" />
               </linearGradient>
@@ -1652,6 +2115,25 @@ function LipSyncPanel({
             <text x="36" y="40" textAnchor="middle" fontSize="12" fontWeight="700" fill="white">{Math.round(progress)}%</text>
           </svg>
           <p className="text-sm text-slate-400">视频解析中…</p>
+          <div className="flex flex-wrap gap-2 justify-center w-full max-w-[260px]">
+            <button
+              type="button"
+              onClick={onCancelParse}
+              className="flex-1 min-w-[100px] px-3 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
+              style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.95)' }}
+            >
+              取消解析
+            </button>
+            <button
+              type="button"
+              onClick={onBackgroundParse}
+              className="flex-1 min-w-[100px] px-3 py-2 rounded-xl text-xs font-medium transition-all hover:brightness-110"
+              style={{ background: 'linear-gradient(135deg,rgba(0,102,255,0.35),rgba(0,242,234,0.25))', border: '1px solid rgba(0,240,255,0.35)', color: '#e0f7ff' }}
+            >
+              后台解析
+            </button>
+          </div>
+          <p className="text-[10px] text-center leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>后台解析可在本地保存进度；刷新页面或再次右键「AI对口型」可继续查看</p>
         </div>
       )}
 
@@ -1682,9 +2164,9 @@ function LipSyncPanel({
                 <span className="material-symbols-outlined text-xs" style={{ transform: showLangDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} aria-hidden="true">expand_more</span>
               </button>
               {showLangDropdown && (
-                <div className="absolute right-0 mt-1 w-28 rounded-lg shadow-2xl overflow-hidden z-50" style={{ backgroundColor: '#1A1B23', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {LIP_SYNC_LANGUAGES.map(l => (
-                    <button key={l} onClick={() => onLangChange(l)} className="w-full px-3 py-2.5 text-left text-xs transition-colors flex items-center justify-between" style={{ color: lang === l ? '#0066FF' : 'rgba(203,213,225,0.9)', fontWeight: lang === l ? 700 : 400 }} onMouseEnter={e => { if (lang !== l) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}>
+                <div className="absolute right-0 mt-1 min-w-[180px] w-max max-w-[min(100vw-1rem,240px)] rounded-lg shadow-2xl overflow-hidden z-50" style={{ backgroundColor: '#1A1B23', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {LIPSYNC_TARGET_LANGUAGES.map(l => (
+                    <button key={l} onClick={() => onLangChange(l)} className="w-full px-3 py-2.5 text-left text-xs transition-colors flex items-center justify-between gap-2" style={{ color: lang === l ? '#0066FF' : 'rgba(203,213,225,0.9)', fontWeight: lang === l ? 700 : 400 }} onMouseEnter={e => { if (lang !== l) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}>
                       {l}
                       {lang === l && <span className="material-symbols-outlined text-xs" style={{ color: '#0066FF' }} aria-hidden="true">check</span>}
                     </button>
@@ -1721,7 +2203,7 @@ function LipSyncPanel({
               className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: 'linear-gradient(135deg,#7000ff,#0066FF)', boxShadow: '0 4px 14px rgba(0,102,255,0.3)' }}
             >
-              开始对口型
+              开始 AI 对口型
             </button>
           </div>
         </div>
@@ -1735,7 +2217,7 @@ function LipSyncPanel({
           </div>
           <div className="w-full space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-white">对口型生成中…</span>
+              <span className="text-sm font-medium text-white">AI对口型生成中…</span>
               <span className="text-sm font-mono" style={{ color: '#00f0ff' }}>{Math.round(progress)}%</span>
             </div>
             <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
@@ -1745,28 +2227,13 @@ function LipSyncPanel({
               />
             </div>
           </div>
-          <p className="text-xs text-center" style={{ color: 'rgba(148,163,184,0.5)' }}>可切换到其他面板继续工作，完成后自动替换 V1 轨道</p>
+          <p className="text-xs text-center" style={{ color: 'rgba(148,163,184,0.5)' }}>可切换到其他面板继续工作，完成后可右键点击 AI 对口型查看任务</p>
         </div>
       )}
 
       {/* done */}
       {stage === 'done' && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)' }}>
-            <span className="material-symbols-outlined text-2xl" style={{ color: '#00f0ff', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
-          </div>
-          <div className="text-center space-y-1.5">
-            <p className="text-base font-semibold text-white">生成完成 ✓</p>
-            <p className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>对口型视频已原地替换 V1 轨道</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="px-6 py-2 rounded-xl text-sm font-medium border transition-all hover:bg-white/5"
-            style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.9)' }}
-          >
-            关闭
-          </button>
-        </div>
+        <LipSyncDonePanel onReplaceTrack={onReplaceTrack} onReEdit={onReEdit} />
       )}
     </div>
   )
