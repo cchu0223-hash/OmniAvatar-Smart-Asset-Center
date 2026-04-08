@@ -4,7 +4,7 @@ title: "OmniAvatar AI素材生成中心 — AI对口型功能集成 v5.7.5"
 status: planning
 owner: ""
 created: 2026-04-01
-updated: 2026-04-07
+updated: 2026-04-08
 linked-designs: []
 linked-epics: []
 version: "5.7.5"
@@ -40,7 +40,7 @@ supersedes: "prd-5.7.2"
 **目标**：将剪辑好的中文短剧片段生成英语对口型版本
 **流程**：
 1. 在专业剪辑页完成视频粗剪，V1 轨道上有一段 2 分钟的短剧片段
-2. 右键 V1 轨道上的视频片段，选择「视频对口型」
+2. 右键 V1 轨道上的视频片段，选择「AI 对口型」
 3. 左侧面板自动切换至对口型面板，左侧导航栏底部动态出现「对口型」图标
 4. 系统直接使用轨道上的视频进行解析（无需重新上传）
 5. 解析完成后，面板展示台词编辑区，选择目标语言为英语，微调翻译台词
@@ -80,7 +80,7 @@ supersedes: "prd-5.7.2"
 1. 用户将视频素材拖入 V1 轨道
 2. 视频片段插入成功后，片段右上角自动弹出引导气泡：「💡 试试 AI 对口型，右键即可开始」
 3. 气泡 3 秒后自动消失，或用户点击「知道了」关闭
-4. 用户右键视频片段，看到「视频对口型」选项
+4. 用户右键视频片段，看到「AI 对口型」选项
 5. 点击后进入对口型流程（与场景 1 相同）
 6. 引导气泡仅在用户首次插入视频时展示一次（通过 LocalStorage 标记 `hasSeenLipSyncGuide`）
 
@@ -323,9 +323,12 @@ idle → parsing → editing → generating → done → idle
   - 面板不可操作，但用户可切换到其他面板继续剪辑
 
 - **生成完成**（`done`）：
-  - 面板：「生成完成 ✓」提示
-  - 提示文案：「您可在 AIGC 工具箱 - AI 对口型页面查看历史合成任务」
-  - 「关闭」按钮（点击后面板切回上一个活动面板或素材面板）
+  - 面板顶部：「生成完成 ✓」标识 + AI 对口型标签
+  - 16:9 视频播放区（支持播放/暂停、下载、全屏）
+  - 底部操作：「一键替换轨道」主按钮（渐变紫蓝）+ 「重新编辑」次按钮
+  - 「重新编辑」行为：
+    - 若当前任务状态为**解析成功**（用户未曾生成过）→ 覆盖当前任务，重新进入 `editing` 态
+    - 若当前任务状态为**合成成功** → 新建任务，重新进入 `editing` 态，原任务保留在「我的」Tab
 
 **轨道进度展示**
 
@@ -334,10 +337,12 @@ idle → parsing → editing → generating → done → idle
   - 进度条宽度 = 片段宽度 × (progress / 100)
   - 进度条上方居中展示「对口型中 XX%」文字标签
   - 进度条动画过渡 `0.35s ease`
-- **生成完成**：进度条消失，V1 轨道片段原地替换为对口型视频
-  - 片段缩略图更新为新视频首帧
-  - 片段 `sourceUrl` 指向生成后的视频 URL
-  - 替换为原子操作，不新增轨道、不改变片段在时间轴上的位置和时长
+- **生成完成**：进度条变为「100% 生成完成」蓝青渐变 overlay，**持续展示**直至用户主动替换
+  - 用户通过面板「一键替换轨道」按钮或右键菜单「一键替换轨道」执行替换后：
+    - overlay 消失，片段缩略图更新为对口型视频首帧
+    - 片段 `sourceUrl` 指向生成后的视频 URL
+    - 替换为原子操作，不新增轨道、不改变片段在时间轴上的位置和时长
+  - **多片段场景**：对口型状态以 clip 为粒度绑定；右键哪个 V1 片段即查看/操作该 clip 的对口型进度，各 clip 状态互不干扰
 
 **任务同步**
 
@@ -348,6 +353,10 @@ idle → parsing → editing → generating → done → idle
 - 进度轮询：剪辑页和落地页各自独立轮询同一个 `taskId` 的进度
 
 > **无 Toast**：生成成功后的反馈仅通过对口型面板 `done` 态与轨道片段替换体现，不弹出全局 Toast。
+
+> **任务取消策略**：处理中任务**不支持取消**，算力**不退还**。「我的」Tab 处理中卡片不展示取消按钮，其余操作按钮禁用。
+
+> **落地页 generating 态行为**：用户点击「生成视频」成功提交后，页面自动切换至「我的」Tab，工作区回到 `idle`（重置 `LipSyncState`），同时「我的」Tab 顶部展示提示条「任务已提交，正在处理中」；用户在「我的」Tab 通过进度轮询实时查看进度。
 
 ### P1 — 应该实现
 
@@ -400,7 +409,7 @@ idle → parsing → editing → generating → done → idle
 | `LipSyncParsing` | `src/pages/ProEditor/components/` | 面板解析态：素材信息 + 圆形进度环 |
 | `LipSyncEditing` | `src/pages/ProEditor/components/` | 面板编辑态：语言选择 + 台词列表 + 操作栏 |
 | `LipSyncGenerating` | `src/pages/ProEditor/components/` | 面板生成态：进度提示 |
-| `LipSyncDone` | `src/pages/ProEditor/components/` | 面板完成态：成功提示 + 关闭按钮 |
+| `LipSyncDone` | `src/pages/ProEditor/components/` | 面板完成态：生成完成标识 + 视频预览（播放/暂停/下载/全屏）+ 「一键替换轨道」+ 「重新编辑」 |
 | `TrackProgressOverlay` | `src/pages/ProEditor/components/` | V1 轨道片段上的渐变进度条叠加层 |
 | `TrackContextMenu` | `src/pages/ProEditor/components/` | 轨道右键上下文菜单（含「AI对口型」选项；实现参考 `ProfessionalEditPage.tsx`） |
 | `LipSyncGuideBubble` | `src/pages/ProEditor/components/` | 新功能引导气泡（首次插入视频时展示，3s 自动消失） |
@@ -639,7 +648,11 @@ interface RecommendVideo {
 
 - [x] 视频文件大小上限：≤ 500MB（已确认）
 - [x] 剪辑页对口型面板位置：左侧面板 288px（已确认）
-- [x] 生成成功后轨道行为：原地替换 V1 轨道片段（已确认）
+- [x] 生成成功后轨道行为：V1 轨道叠加「100% 生成完成」overlay，用户通过面板或右键菜单主动一键替换（已确认）
+- [x] 任务取消：处理中任务不支持取消，算力不退还（已确认）
+- [x] 重新编辑行为：解析成功任务重新编辑覆盖当前任务；合成成功任务重新编辑新建任务（已确认）
+- [x] 落地页 generating 态：提交后自动切换「我的」Tab，「我的」Tab 展示进度（已确认）
+- [x] 多片段场景：对口型状态以 clip 为粒度，右键哪个片段操作哪个（已确认）
 - [x] 剪辑页触发对口型时视频来源：直接使用轨道上的视频（已确认）
 - [x] 任务同步方向：双向（剪辑页 ⇄ 落地页），不区分来源标记（已确认）
 - [x] 轨道进度展示形式：V1 轨道上叠加渐变进度条（已确认）
@@ -681,6 +694,7 @@ interface RecommendVideo {
 |------|------|---------|
 | V5.7.2 | 2026-03-31 | 新增对口型落地页（`/lipsync`）；专业剪辑页集成对口型功能；支持 8 种目标语言；双向任务同步；新增引导气泡；动态对口型导航图标 |
 | V5.7.5 | 2026-04-02 | **范围对齐**：8 种语言、无 FR/DE；「我的」无搜索/筛选；无生成完成 Toast；「我的」含剪辑页发起任务等（见正文）。**文案**：Hero 打字机主标题「讯飞智作」+「，AI对口型一步到位」（单行）；副标题「多语种真实对口型视频，让您的视频全球发声。」；脚注「如发现解析不准确…」及「专业剪辑」链至 `/professional-edit`。**Hero `EditorPane`**：脚注固底、台词区滚动；段播放/暂停/续播；高亮仅播放中；点编辑暂停。**日间**：编辑卡片/段播放钮/脚注浅紫；卡片叠字与 Mine 渐变按钮白字；首页胶囊下拉浅色浮层 + 生成按钮白字。**PRD** 新增「Hero 内嵌台词演示区」「日间模式」小节。 |
+| V5.7.5-rev2 | 2026-04-08 | **交互修订（剪辑页 done 态）**：生成完成后由自动替换改为用户主动一键替换；`done` 态面板新增视频预览（播放/暂停/下载/全屏）、「一键替换轨道」及「重新编辑」按钮；V1 轨道持续展示「100% 生成完成」overlay 直至用户替换。**产品策略明确**：任务取消不支持 & 算力不退还；重新编辑区分解析成功（覆盖）/ 合成成功（新建）两种行为；落地页生成提交后自动跳转「我的」Tab；多片段以 clip 为粒度绑定状态。**规范修订**：统一右键菜单入口名称为「AI 对口型」；修复 `done` 态功能描述、轨道替换描述、开放问题三处内容矛盾；补充 `LipSyncDone` 组件描述；新增 3 条剪辑页埋点（`view_task_click` / `replace_track_click` / `reedit_click`）。 |
 | V5.7.5-rev1 | 2026-04-02 | **实现对齐（落地页）**：**时间轴**改为分段时间条（无 Mock 胶片帧）；**`SegmentItem`** 落地页不启用 `lipsyncEditThreshold`；**单段字数**超限提示仅在该段 **保存后、非编辑** 展示，**解析阶段**与**编辑中草稿**不展示；**总字数**仍顶栏提示；**合成视频** 在超限 / 保存中 / 未关闭段落编辑时禁用；**保存** 有「保存中」态；**InfoTip** 紫色 i + 浅色浮层黑字；**`DemoVideoCard`** 移除「做同款」；**`MineCard`** 时长 Chip **仅成功**态展示。详见「Hero 内嵌台词演示区」正文。 |
 
 ---
@@ -714,6 +728,9 @@ interface RecommendVideo {
 | `editor_lipsync_generate_click` | 点击开始对口型 | `user_id`, `task_id`, `target_language` |
 | `editor_lipsync_generate_success` | 对口型生成成功 | `user_id`, `task_id`, `clip_id` |
 | `editor_lipsync_replace_complete` | 轨道片段替换完成 | `user_id`, `task_id`, `clip_id` |
+| `editor_lipsync_view_task_click` | 右键菜单「查看生成任务」 | `user_id`, `clip_id`, `task_id` |
+| `editor_lipsync_replace_track_click` | 面板/右键「一键替换轨道」点击 | `user_id`, `clip_id`, `task_id`, `trigger_source`（`panel`\|`contextmenu`） |
+| `editor_lipsync_reedit_click` | 面板「重新编辑」点击 | `user_id`, `clip_id`, `task_id`, `task_status`（`parsing_done`\|`success`） |
 
 ### 北极星指标
 

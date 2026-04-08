@@ -81,6 +81,7 @@ export default function LipSyncPage() {
   const [tasks, setTasks] = useState<LipSyncTask[]>(MINE_MOCK)
   const [showZtkModal, setShowZtkModal] = useState(false)
   const [compareCard, setCompareCard] = useState<typeof CARDS[0] | null>(null)
+  const [showSubmitBanner, setShowSubmitBanner] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [parseProgress, setParseProgress] = useState(0)
   // typewriter: how many chars of each segment text are revealed
@@ -231,6 +232,8 @@ export default function LipSyncPage() {
     setTasks(prev => [{ id: Date.now().toString(), name: uploadedFileName, status: 'processing', progress: 0, targetLanguage: selectedLang.split(' · ')[0], duration: '1m20s', createdAt: Date.now() }, ...prev])
     setStage('idle')
     setActiveTab('mine')
+    setShowSubmitBanner(true)
+    setTimeout(() => setShowSubmitBanner(false), 4000)
   }
 
   // resume draft
@@ -423,6 +426,12 @@ export default function LipSyncPage() {
 
               {activeTab === 'mine' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {showSubmitBanner && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'rgba(0,242,234,0.08)', border: '1px solid rgba(0,242,234,0.25)', marginBottom: '4px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#00f2ea', flexShrink: 0 }}>check_circle</span>
+                      <span style={{ fontSize: '13px', color: 'rgba(203,213,225,0.9)' }}>任务已提交，正在处理中，请稍候查看进度</span>
+                    </div>
+                  )}
                   {tasks.length === 0 && <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: '14px' }}>暂无合成记录</div>}
                   {tasks.map(task => (
                     <MineCard key={task.id} task={task} fmtTime={fmtTime} onDelete={id => setTasks(prev => prev.filter(t => t.id !== id))} onResume={handleResumeDraft} />
