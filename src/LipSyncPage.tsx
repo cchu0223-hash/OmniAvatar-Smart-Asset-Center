@@ -1155,26 +1155,40 @@ function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fm
         )}
 
         {/* Actions */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginTop: '2px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '2px', alignItems: 'center' }}>
           {(isDraft || task.status === 'bg-parsing' && task.progress >= 100) && (
-            <button onClick={() => onResume(task)} className="mine-action-gradient" style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff 0%,#3b82ff 50%,#7b2bff 100%)', color: '#ffffff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.1)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.filter = 'none' }}>继续编辑</button>
+            <button className="task-btn" onClick={() => onResume(task)}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              继续编辑
+            </button>
           )}
           {task.status === 'success' && (
             <>
-              <button onClick={() => onResume(task)} className="mine-action-gradient" style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#00e5ff 0%,#3b82ff 50%,#7b2bff 100%)', color: '#ffffff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.1)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.filter = 'none' }}>重新编辑</button>
-              <button style={{ height: 'auto', padding: 0, border: 'none', background: 'transparent', color: 'rgba(180,190,204,0.9)', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', gap: '4px', alignItems: 'center' }}>⇩ 下载</button>
+              <button className="task-btn-dl" title="下载">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <button className="task-btn" onClick={() => onResume(task)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                再做一条
+              </button>
             </>
           )}
           {task.status === 'failed' && (
-            <button className="mine-action-gradient" style={{ minWidth: '72px', height: '32px', padding: '0 20px', borderRadius: '999px', background: 'linear-gradient(135deg,#ff6b6b,#ff4757)', color: '#ffffff', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>重试</button>
+            <button className="task-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+              重试
+            </button>
           )}
+          <button className="task-btn" onClick={() => onDelete(task.id)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            删除
+          </button>
         </div>
       </div>
 
       {/* Meta */}
       <div className="mine-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: '72px', paddingLeft: '12px', fontSize: '13px', color: 'var(--text-dim)', gap: '8px' }}>
         <span className="mine-meta-time">{fmtTime(task.createdAt)}</span>
-        <button onClick={() => onDelete(task.id)} className="mine-delete-btn" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '999px', padding: '0 14px', height: '30px', fontSize: '12px', color: 'var(--text-strong)', cursor: 'pointer', marginTop: 'auto' }}>删除</button>
       </div>
     </article>
   )

@@ -412,6 +412,76 @@
   border-color: rgba(0,0,0,0.3) !important;
 }
 
+/* ── Task card action buttons ─────────────────────────────── */
+
+/* Ghost pill: 继续编辑 / 再做一条 / 重试 / 删除 */
+.task-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(195,210,230,0.75);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.task-btn:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(215,228,245,0.9);
+}
+.task-btn:active { transform: scale(0.96); }
+
+[data-theme="light"] .task-btn {
+  background: rgba(100,116,139,0.07);
+  border-color: rgba(100,116,139,0.16);
+  color: #64748b;
+}
+[data-theme="light"] .task-btn:hover {
+  background: rgba(100,116,139,0.13);
+  border-color: rgba(100,116,139,0.28);
+  color: #475569;
+}
+
+/* Download: icon-only pill, same height as task-btn, gray to match theme */
+.task-btn-dl {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(195,210,230,0.75);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.task-btn-dl:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(215,228,245,0.9);
+}
+.task-btn-dl:active { transform: scale(0.96); }
+
+[data-theme="light"] .task-btn-dl {
+  background: rgba(100,116,139,0.07);
+  border-color: rgba(100,116,139,0.16);
+  color: #64748b;
+}
+[data-theme="light"] .task-btn-dl:hover {
+  background: rgba(100,116,139,0.13);
+  border-color: rgba(100,116,139,0.28);
+  color: #475569;
+}
+
 /* 更多实例视频卡片 hover */
 [data-theme="light"] .v-card:hover,
 [data-theme="light"] .vcard-hover {
