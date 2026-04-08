@@ -5,6 +5,7 @@ import TextType from './TextType'
 import { useNavigate } from 'react-router-dom'
 import { useTour } from './useTour'
 import { addMaterial } from './smartMaterialsStore'
+import { useTheme } from './useTheme'
 
 type GenerationCategory = 'image' | 'video'
 type AspectRatio = '1:1' | '3:4' | '4:3' | '16:9' | '9:16'
@@ -52,6 +53,7 @@ const formatSubmitTime = (ts: number): string => {
 
 function App() {
   const navigate = useNavigate()
+  const { theme, toggle: toggleTheme } = useTheme()
 
   // ── Onboarding Tour (首页 3 步引导) ──
   useTour(
@@ -412,7 +414,7 @@ function App() {
       </div>
 
       {/* Main Container */}
-      <div className="relative flex min-h-screen w-full flex-col z-10">
+      <div id="app-root" className="relative flex min-h-screen w-full flex-col z-10">
         {/* Header */}
         <header className="flex items-center justify-between border-b border-white/5 px-6 py-4 lg:px-20 bg-[#0B0C10]/60 backdrop-blur-xl sticky top-0 z-50">
           <div className="flex items-center gap-4">
@@ -432,12 +434,20 @@ function App() {
               专业剪辑
             </button>
             <div className="h-4 w-px bg-white/10" />
+            <button onClick={() => navigate('/lipsync')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>record_voice_over</span>
+              AI对口型
+            </button>
+            <div className="h-4 w-px bg-white/10" />
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(0,102,255,0.08)', border: '1px solid rgba(0,102,255,0.2)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#60a5fa' }}>auto_awesome</span>
               <span className="text-xs font-medium" style={{ color: '#60a5fa' }}>AI素材生成</span>
             </div>
           </div>
           <div className="flex items-center gap-5">
+            <button onClick={toggleTheme} title={theme === 'light' ? '切换夜间模式' : '切换日间模式'} className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer">
+              <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
+            </button>
             <div id="tour-credits" onClick={() => setShowCreditsHistory(true)} className="flex items-center bg-white/5 px-4 py-1.5 rounded-full border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined text-sm mr-2 text-accent-cyan" style={{ fontVariationSettings: '"FILL" 1' }}>bolt</span>
               <span className="text-xs font-semibold text-slate-300 tracking-wide">算力: <span className="text-white">1280</span></span>
@@ -454,7 +464,7 @@ function App() {
           <div className="text-center mb-16 lg:mb-20 relative">
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent-cyan/5 blur-[100px] rounded-full pointer-events-none"></div>
             <h1 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight flex items-center justify-center flex-wrap gap-x-3">
-              <span className="bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent drop-shadow-sm whitespace-nowrap">开启您的企业级</span>
+              <span className="hero-static bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent drop-shadow-sm whitespace-nowrap">开启您的企业级</span>
               <TextType
                 text={['高质量 AI 创作', '沉浸式视频生成', '智能内容生产']}
                 typingSpeed={120}
@@ -465,7 +475,7 @@ function App() {
                 cursorClassName="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent"
               />
             </h1>
-            <p className="text-slate-400 text-lg font-light tracking-wide max-w-2xl mx-auto">从图片生成到视频创作，AI 驱动的一站式内容生产平台</p>
+            <p className="hero-sub text-slate-400 text-lg font-light tracking-wide max-w-2xl mx-auto">从图片生成到视频创作，AI 驱动的一站式内容生产平台</p>
           </div>
 
           {/* Input Panel */}
@@ -473,7 +483,7 @@ function App() {
             <div className="absolute -left-4 top-10 w-2 h-20 bg-gradient-to-b from-transparent via-accent-cyan/20 to-transparent rounded-full blur-[1px]"></div>
             <div className="absolute -right-4 bottom-20 w-2 h-20 bg-gradient-to-b from-transparent via-accent-purple/20 to-transparent rounded-full blur-[1px]"></div>
             <div className="glass-panel-premium rounded-[2rem] p-1 shadow-2xl transition-all duration-500">
-              <div className="bg-[#0B0C10]/40 rounded-[1.9rem] p-6 lg:p-10 backdrop-blur-sm">
+              <div className="app-capsule-inner bg-[#0B0C10]/40 rounded-[1.9rem] p-6 lg:p-10 backdrop-blur-sm">
                 {/* Input Area */}
                 <div className="input-glow-border min-h-[180px] p-5 mb-8 relative group/input">
                   <div className="absolute inset-0 overflow-hidden rounded-[1rem] pointer-events-none opacity-20">
