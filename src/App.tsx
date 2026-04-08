@@ -434,6 +434,11 @@ function App() {
               专业剪辑
             </button>
             <div className="h-4 w-px bg-white/10" />
+            <button onClick={() => navigate('/lipsync')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>record_voice_over</span>
+              AI对口型
+            </button>
+            <div className="h-4 w-px bg-white/10" />
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(0,102,255,0.08)', border: '1px solid rgba(0,102,255,0.2)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#60a5fa' }}>auto_awesome</span>
               <span className="text-xs font-medium" style={{ color: '#60a5fa' }}>AI素材生成</span>

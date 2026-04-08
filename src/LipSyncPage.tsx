@@ -322,10 +322,24 @@ export default function LipSyncPage() {
 
         {/* Header */}
         <header className="flex items-center justify-between px-8 h-14 sticky top-0" style={{ background: 'var(--bg-header)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-header)', zIndex: 50 }}>
-          <button type="button" title="返回首页" onClick={() => navigate('/')} className="flex items-center gap-2 cursor-pointer" style={{ transition: 'filter 0.2s' }} onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.18)')} onMouseLeave={e => (e.currentTarget.style.filter = 'none')}>
-            <img src={theme === 'light' ? '/logo-light.png' : '/title-logo.gif'} alt="" style={{ height: '28px' }} />
-            <span className="lipsync-header-home-link" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 600, fontSize: '15px', color: 'var(--text-bright)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>返回首页</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button type="button" title="返回首页" onClick={() => navigate('/')} className="flex items-center gap-2 cursor-pointer" style={{ transition: 'filter 0.2s' }} onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.18)')} onMouseLeave={e => (e.currentTarget.style.filter = 'none')}>
+              <img src={theme === 'light' ? '/logo-light.png' : '/title-logo.gif'} alt="" style={{ height: '28px' }} />
+            </button>
+            <div style={{ width: '1px', height: '16px', background: 'var(--border-main)' }} />
+            <button type="button" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', transition: 'color 0.15s, background 0.15s' }} onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }} onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'none' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>auto_awesome</span>
+              AI素材生成
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 600, padding: '4px 8px', borderRadius: '6px', background: 'rgba(0,242,255,0.08)', border: '1px solid rgba(0,242,255,0.2)', color: '#00f2ff' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>record_voice_over</span>
+              AI对口型
+            </div>
+            <button type="button" onClick={() => navigate('/professional-edit')} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', transition: 'color 0.15s, background 0.15s' }} onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }} onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'none' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>movie_edit</span>
+              专业剪辑
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', backdropFilter: 'blur(12px)', cursor: 'pointer' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#a78bfa', fontVariationSettings: '"FILL" 1' }}>bolt</span>
