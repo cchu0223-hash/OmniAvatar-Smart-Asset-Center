@@ -308,7 +308,7 @@ export default function LipSyncPage() {
 
   const fmtTime = (ts: number) => {
     const d = new Date(ts)
-    return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
   return (
@@ -450,6 +450,9 @@ export default function LipSyncPage() {
                   {tasks.map(task => (
                     <MineCard key={task.id} task={task} fmtTime={fmtTime} onDelete={id => setTasks(prev => prev.filter(t => t.id !== id))} onResume={handleResumeDraft} />
                   ))}
+                  {tasks.length > 0 && (
+                    <p style={{ textAlign: 'center', margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>任务记录支持保留近 3 年提交历史</p>
+                  )}
                 </div>
               )}
             </div>
@@ -1098,6 +1101,28 @@ function VideoCard({ card, onPlay, onZtk }: { card: typeof CARDS[0]; onPlay: () 
   )
 }
 
+// ── ExpireInfoIcon ──
+function ExpireInfoIcon({ isDraft }: { isDraft: boolean }) {
+  const [show, setShow] = useState(false)
+  const tip = isDraft ? '草稿过期后不支持继续编辑' : '合成视频过期后不支持下载和预览'
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <span
+        onClick={e => { e.stopPropagation(); setShow(v => !v) }}
+        style={{ width: '13px', height: '13px', borderRadius: '50%', border: '1px solid currentColor', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', cursor: 'pointer', flexShrink: 0, opacity: 0.7 }}
+      >i</span>
+      {show && (
+        <>
+          <span style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setShow(false)} />
+          <span style={{ position: 'absolute', bottom: '18px', right: 0, zIndex: 1000, background: '#1e2a3a', border: '1px solid rgba(127,214,255,0.25)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'rgba(203,213,225,0.9)', whiteSpace: 'nowrap', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', lineHeight: 1.5 }}>
+            {tip}
+          </span>
+        </>
+      )}
+    </span>
+  )
+}
+
 // ── MineCard ──
 function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fmtTime: (n: number) => string; onDelete: (id: string) => void; onResume: (t: LipSyncTask) => void }) {
   const isDraft = task.status === 'draft'
@@ -1189,6 +1214,22 @@ function MineCard({ task, fmtTime, onDelete, onResume }: { task: LipSyncTask; fm
       {/* Meta */}
       <div className="mine-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: '72px', paddingLeft: '12px', fontSize: '13px', color: 'var(--text-dim)', gap: '8px' }}>
         <span className="mine-meta-time">{fmtTime(task.createdAt)}</span>
+        {(() => {
+          const expireDays = isDraft ? 15 : 30
+          const expireTs = task.createdAt + expireDays * 24 * 60 * 60 * 1000
+          const expireDate = new Date(expireTs)
+          const yyyy = expireDate.getFullYear()
+          const mm = String(expireDate.getMonth() + 1).padStart(2, '0')
+          const dd = String(expireDate.getDate()).padStart(2, '0')
+          const hh = String(expireDate.getHours()).padStart(2, '0')
+          const mi = String(expireDate.getMinutes()).padStart(2, '0')
+          return (
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              {yyyy}-{mm}-{dd} {hh}:{mi} 过期
+              <ExpireInfoIcon isDraft={isDraft} />
+            </span>
+          )
+        })()}
       </div>
     </article>
   )
