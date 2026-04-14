@@ -1,1 +1,872 @@
-/* All styles are now in index.html to match the prototype design */
+/* ── Theme Tokens ─────────────────────────────────────────── */
+:root {
+  /* backgrounds */
+  --bg-page:       #030a1a;
+  --bg-header:     rgba(3,10,26,0.82);
+  --bg-header-border: rgba(17,45,70,0.8);
+  --bg-card:       rgba(24,34,52,0.52);
+  --bg-panel:      #141b26;
+  --bg-editor:     #001529;
+  --bg-deep:       #0a0f1a;
+  --bg-timeline:   #0f1520;
+  --bg-input:      #1a2330;
+  --bg-dropdown:   #0b1d33;
+  --bg-overlay:    rgba(3,10,26,0.88);
+  --bg-segment-active: rgba(0,242,255,0.07);
+  --bg-segment-edit:   #374559;
+
+  /* borders */
+  --border-main:   #2f3d52;
+  --border-header: rgba(17,45,70,0.8);
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-card:   rgba(120,190,255,0.22);
+  --border-card-hover: rgba(24,144,255,0.42);
+  --border-input:  rgba(24,144,255,0.35);
+
+  /* text */
+  --text-primary:  #ffffff;
+  --text-bright:   rgba(255,255,255,0.88);
+  --text-strong:   rgba(255,255,255,0.72);
+  --text-secondary: rgba(255,255,255,0.55);
+  --text-secondary2: rgba(255,255,255,0.6);
+  --text-dim:      rgba(255,255,255,0.42);
+  --text-muted:    rgba(255,255,255,0.32);
+  --text-faint:    rgba(255,255,255,0.22);
+
+  /* misc */
+  --shadow-card:   0 8px 40px rgba(0,0,0,0.3);
+  --shadow-panel:  0 20px 60px rgba(0,0,0,0.35);
+}
+
+[data-theme="light"] {
+  /* backgrounds — 设计文件日间模式 (white base) */
+  --bg-page:       #ffffff;
+  --bg-header:     rgba(255,255,255,0.92);
+  --bg-header-border: rgba(0,0,0,0.08);
+  --bg-card:       rgba(255,255,255,0.42);
+  --bg-panel:      #f3f4f8;
+  --bg-editor:     #f3f4f8;
+  --bg-deep:       #e8eaf2;
+  --bg-timeline:   #d8dae8;
+  --bg-input:      #ffffff;
+  --bg-dropdown:   #ffffff;
+  --bg-overlay:    rgba(255,255,255,0.92);
+  --bg-segment-active: rgba(87,82,255,0.08);
+  --bg-segment-edit:   rgba(87,82,255,0.08);
+
+  /* borders */
+  --border-main:   rgba(0,0,0,0.1);
+  --border-header: rgba(0,0,0,0.08);
+  --border-subtle: rgba(0,0,0,0.08);
+  --border-card:   rgba(99,102,241,0.22);
+  --border-card-hover: rgba(50,134,255,0.38);
+  --border-input:  rgba(87,82,255,0.35);
+
+  /* text — 设计文件 #1a1a2e 体系 */
+  --text-primary:  #1a1a2e;
+  --text-bright:   #1a1a2e;
+  --text-strong:   rgba(30,30,60,0.72);
+  --text-secondary: rgba(30,30,60,0.55);
+  --text-secondary2: rgba(30,30,60,0.64);
+  --text-dim:      rgba(30,30,60,0.5);
+  --text-muted:    rgba(30,30,60,0.45);
+  --text-faint:    rgba(30,30,60,0.3);
+
+  /* misc */
+  --shadow-card:   0 2px 12px rgba(0,0,0,0.06);
+  --shadow-panel:  0 20px 60px rgba(0,0,0,0.15);
+}
+
+/* ── App.tsx Tailwind overrides for light mode ─────────────── */
+[data-theme="light"] .bg-\[#1A1B23\],
+[data-theme="light"] .bg-\[#0B0C10\],
+[data-theme="light"] .bg-\[#0D0E14\],
+[data-theme="light"] .bg-\[#0a0a0b\],
+[data-theme="light"] .bg-\[#111118\] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-black\/50,
+[data-theme="light"] .bg-black\/40,
+[data-theme="light"] .bg-black\/30 {
+  background-color: rgba(99,102,241,0.08) !important;
+}
+
+[data-theme="light"] .text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .text-slate-300 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .text-slate-500 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .text-slate-600 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .border-\[#222226\],
+[data-theme="light"] .border-white\/10,
+[data-theme="light"] .border-white\/\[0\.08\] {
+  border-color: rgba(99,102,241,0.18) !important;
+}
+
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(99,102,241,0.05) !important;
+}
+
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(99,102,241,0.08) !important;
+}
+
+/* App 素材中心（/）日间：浅色底 + hero-banner-bg-light 50% 透明度 */
+[data-theme="light"] #app-root {
+  background: #ffffff !important;
+  background-image: none !important;
+  position: relative;
+}
+[data-theme="light"] #app-root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/hero-banner-bg-light.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center -420px;
+  background-attachment: fixed;
+  opacity: 0.5;
+}
+/* 保证头/主内容叠在底图之上（header 自有 z-50） */
+[data-theme="light"] #app-root > main {
+  position: relative;
+  z-index: 1;
+}
+
+/* scrollbar light */
+[data-theme="light"] * {
+  scrollbar-color: rgba(99,102,241,0.3) transparent;
+}
+
+/* LipSync page overlay gradient */
+.lipsync-overlay {
+  background: linear-gradient(180deg,rgba(3,10,26,0.55) 0%,rgba(3,10,26,0.85) 60%,#030a1a 100%);
+}
+[data-theme="light"] .lipsync-overlay {
+  background: linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0) 62%,rgba(255,255,255,0.38) 78%,rgba(255,255,255,0.72) 100%);
+}
+
+/* LipSync page: 日间底图 50% 透明度（叠在纯白底上） */
+[data-theme="light"] .min-h-screen.text-white {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  position: relative;
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .min-h-screen.text-white::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/hero-banner-bg-light.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center -420px;
+  background-attachment: fixed;
+  opacity: 0.5;
+}
+
+/* Header logo 日间图由组件按 theme 切换 src */
+
+/* App.tsx bg-[#0B0C10]/60 header */
+[data-theme="light"] .bg-\[#0B0C10\]\/60 {
+  background-color: rgba(248,250,255,0.94) !important;
+}
+[data-theme="light"] .bg-\[#0B0C10\]\/40 {
+  background-color: rgba(255,255,255,0.7) !important;
+}
+[data-theme="light"] .bg-\[#0D0E14\]\/90 {
+  background-color: rgba(248,250,255,0.95) !important;
+}
+[data-theme="light"] .border-white\/5 {
+  border-color: rgba(99,102,241,0.15) !important;
+}
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(99,102,241,0.18) !important;
+}
+
+/* ── App.tsx header white in light mode ─────────────────────── */
+[data-theme="light"] header.sticky {
+  background: rgba(255,255,255,0.95) !important;
+  border-bottom-color: rgba(99,102,241,0.15) !important;
+  box-shadow: 0 1px 24px rgba(99,102,241,0.08);
+}
+
+/* ── LipSync header in light mode ──────────────────────────── */
+[data-theme="light"] header {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+/* ── 登录按钮 light mode ──────────────────────────────────── */
+[data-theme="light"] .lipsync-login-btn {
+  color: #5752ff !important;
+  background-color: rgba(87,82,255,0.06) !important;
+  border-color: #5752ff !important;
+}
+[data-theme="light"] .lipsync-login-btn:hover {
+  box-shadow: 0 6px 24px rgba(87,82,255,0.35) !important;
+}
+
+/* ── 编辑胶囊 frosted glass in light mode ───────────────────── */
+[data-theme="light"] .glass-panel-premium {
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(32px) saturate(1.6);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,0.75);
+  box-shadow:
+    0 0 0 1px rgba(99,102,241,0.1),
+    0 12px 40px rgba(99,102,241,0.1),
+    0 2px 8px rgba(255,255,255,0.8) inset;
+}
+[data-theme="light"] .glass-panel-premium::before {
+  background: linear-gradient(125deg, rgba(99,102,241,0.04) 0%, rgba(168,85,247,0.04) 100%);
+}
+[data-theme="light"] .glass-panel-premium::after {
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent);
+}
+[data-theme="light"] .input-glow-border {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(99,102,241,0.15);
+}
+[data-theme="light"] .input-glow-border::before {
+  background: linear-gradient(45deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25), transparent 60%);
+}
+[data-theme="light"] .btn-neon-border {
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(99,102,241,0.2);
+}
+[data-theme="light"] .btn-neon-border:hover {
+  border-color: rgba(99,102,241,0.5);
+  box-shadow: 0 0 12px rgba(99,102,241,0.15);
+  background: rgba(99,102,241,0.06);
+}
+
+/* ── 算力 pill in light mode ────────────────────────────────── */
+[data-theme="light"] #tour-credits {
+  background: rgba(255,255,255,0.65) !important;
+  border-color: rgba(99,102,241,0.2) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Popup dropdowns in light mode ──────────────────────────── */
+[data-theme="light"] .bg-\[#1A1B23\]\/95 {
+  background-color: rgba(255,255,255,0.96) !important;
+  backdrop-filter: blur(20px);
+  border-color: rgba(99,102,241,0.18) !important;
+}
+
+/* SegmentItem active */
+[data-theme="light"] .segment-active {
+  background: var(--bg-segment-active);
+  border-color: rgba(99,102,241,0.2);
+}
+
+/* ── LipSync title "讯飞智作" — dark: white gradient, light: #313131→#7a7a8a ── */
+[data-theme="light"] .title-t1 {
+  background: linear-gradient(90deg, #313131 0%, #7a7a8a 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* ── App hero static text (light mode: white→black) ─────────── */
+[data-theme="light"] .hero-static {
+  background: linear-gradient(180deg,#0f172a,#334155) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+[data-theme="light"] .hero-sub {
+  color: #475569 !important;
+}
+
+/* ── App capsule inner — dark: bg-[#0B0C10]/40, light: #F8FAFC ─ */
+[data-theme="light"] .app-capsule-inner {
+  background-color: #F8FAFC !important;
+}
+
+/* ══════════════════════════════════════
+   LIPSYNC LIGHT MODE — 完整还原设计稿 body.theme-light
+   ══════════════════════════════════════ */
+
+/* 副标题 */
+[data-theme="light"] .lipsync-subtitle {
+  color: #747a87 !important;
+}
+
+/* Upload card */
+[data-theme="light"] .upload-card {
+  background: rgba(255,255,255,0.42) !important;
+  backdrop-filter: blur(14px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.5) !important;
+  border: 2px dashed #3286ff !important;
+  box-shadow:
+    0 8px 32px rgba(50,134,255,0.08),
+    0 1px 0 rgba(255,255,255,0.85) inset !important;
+}
+[data-theme="light"] .upload-card:hover {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: #3286ff !important;
+  box-shadow:
+    0 0 0 1px rgba(50,134,255,0.22) inset,
+    0 0 28px rgba(50,134,255,0.18),
+    0 8px 32px rgba(50,134,255,0.14) !important;
+}
+
+/* Upload card 内部文字 */
+[data-theme="light"] .upload-main-text,
+[data-theme="light"] .upload-text-bright {
+  color: #5752ff !important;
+}
+[data-theme="light"] .upload-formats,
+[data-theme="light"] .upload-text-dim {
+  color: #747a87 !important;
+}
+
+/* Upload loading overlay */
+[data-theme="light"] .upload-loading-overlay {
+  background: rgba(255,255,255,0.92) !important;
+}
+[data-theme="light"] .upload-loading-text-el {
+  color: rgba(30,30,60,0.85) !important;
+}
+[data-theme="light"] .upload-spinner {
+  border-color: rgba(87,82,255,0.2) !important;
+  border-top-color: #5752ff !important;
+}
+
+/* Tabs */
+[data-theme="light"] .tab-btn-inactive {
+  color: rgba(116,122,135,0.72) !important;
+}
+[data-theme="light"] .tab-btn-active {
+  color: #5752ff !important;
+}
+[data-theme="light"] .tab-indicator {
+  background: linear-gradient(90deg, #1890ff, #5752ff) !important;
+}
+
+/* MineCard / task card */
+[data-theme="light"] .mine-card {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] .mine-card:hover {
+  background: #ffffff !important;
+  border-color: rgba(50,134,255,0.38) !important;
+  box-shadow:
+    0 4px 20px rgba(50,134,255,0.16),
+    0 8px 32px rgba(50,134,255,0.10) !important;
+}
+[data-theme="light"] .mine-card-draft {
+  background: rgba(255,255,255,0.75) !important;
+  border-color: rgba(87,82,255,0.4) !important;
+}
+[data-theme="light"] .mine-title {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .mine-subtitle {
+  color: rgba(30,30,60,0.55) !important;
+}
+[data-theme="light"] .mine-meta,
+[data-theme="light"] .mine-meta-time {
+  color: rgba(30,30,60,0.45) !important;
+}
+[data-theme="light"] .mine-chip {
+  border-color: rgba(0,0,0,0.12) !important;
+  color: rgba(30,30,60,0.75) !important;
+  background: rgba(0,0,0,0.05) !important;
+}
+[data-theme="light"] .mine-delete-btn {
+  border-color: rgba(0,0,0,0.18) !important;
+  color: rgba(30,30,60,0.6) !important;
+}
+[data-theme="light"] .mine-delete-btn:hover {
+  background: rgba(0,0,0,0.05) !important;
+  border-color: rgba(0,0,0,0.3) !important;
+}
+
+/* ── Task card action buttons ─────────────────────────────── */
+
+/* Ghost pill: 继续编辑 / 再做一条 / 重试 / 删除 */
+.task-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(195,210,230,0.75);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.task-btn:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(215,228,245,0.9);
+}
+.task-btn:active { transform: scale(0.96); }
+
+[data-theme="light"] .task-btn {
+  background: rgba(100,116,139,0.07);
+  border-color: rgba(100,116,139,0.16);
+  color: #64748b;
+}
+[data-theme="light"] .task-btn:hover {
+  background: rgba(100,116,139,0.13);
+  border-color: rgba(100,116,139,0.28);
+  color: #475569;
+}
+
+/* Download: icon-only pill, same height as task-btn, gray to match theme */
+.task-btn-dl {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(195,210,230,0.75);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.task-btn-dl:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(215,228,245,0.9);
+}
+.task-btn-dl:active { transform: scale(0.96); }
+
+[data-theme="light"] .task-btn-dl {
+  background: rgba(100,116,139,0.07);
+  border-color: rgba(100,116,139,0.16);
+  color: #64748b;
+}
+[data-theme="light"] .task-btn-dl:hover {
+  background: rgba(100,116,139,0.13);
+  border-color: rgba(100,116,139,0.28);
+  color: #475569;
+}
+
+/* 更多实例视频卡片 hover */
+[data-theme="light"] .v-card:hover,
+[data-theme="light"] .vcard-hover {
+  box-shadow:
+    0 6px 24px rgba(50,134,255,0.18),
+    0 12px 36px rgba(50,134,255,0.12) !important;
+  border-color: rgba(50,134,255,0.30) !important;
+}
+
+/* Hero 右侧大视频卡片 */
+[data-theme="light"] .hero-right-card:hover {
+  box-shadow:
+    0 6px 28px rgba(50,134,255,0.20),
+    0 0 0 1px rgba(50,134,255,0.22) !important;
+}
+
+/* 做同款弹窗 */
+[data-theme="light"] .ztk-modal-backdrop {
+  background: rgba(0,0,0,0.35) !important;
+}
+[data-theme="light"] .ztk-modal {
+  background: #ffffff !important;
+  color: #1a1a2e !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+}
+[data-theme="light"] .ztk-modal-videos {
+  background: #f3f4f8 !important;
+}
+[data-theme="light"] .ztk-video-label {
+  color: rgba(30,30,60,0.75) !important;
+}
+[data-theme="light"] .ztk-video-frame {
+  background: #e8eaf2 !important;
+}
+[data-theme="light"] .ztk-video-progress {
+  background: rgba(0,0,0,0.1) !important;
+}
+[data-theme="light"] .ztk-video-progress-bar {
+  background: #5752ff !important;
+}
+[data-theme="light"] .ztk-modal-title-text {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .ztk-modal-cta {
+  box-shadow: 0 6px 20px rgba(59,130,246,0.38) !important;
+}
+[data-theme="light"] .ztk-modal-cta:hover {
+  box-shadow: 0 8px 26px rgba(59,130,246,0.50) !important;
+}
+
+/* Hero Editor (台词编辑面板) */
+[data-theme="light"] .hero-editor {
+  background: #f3f4f8 !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+[data-theme="light"] .hero-editor-top {
+  border-color: rgba(0,0,0,0.1) !important;
+}
+[data-theme="light"] .hero-editor-filename {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .hero-ed-btn {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .hero-ed-btn:hover {
+  border-color: rgba(0,0,0,0.3) !important;
+}
+[data-theme="light"] .hero-ed-left {
+  background: #e8eaf2 !important;
+}
+[data-theme="light"] .hero-ed-strip {
+  background: #d8dae8 !important;
+}
+
+/* 分段时间轴（无视频帧） */
+.hero-ed-strip-gap {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+.hero-ed-strip-chunk {
+  background: linear-gradient(180deg, rgba(87, 82, 255, 0.28), rgba(30, 35, 55, 0.45));
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-sizing: border-box;
+}
+.hero-ed-strip-chunk--active {
+  background: linear-gradient(180deg, rgba(0, 242, 255, 0.35), rgba(87, 82, 255, 0.3));
+  border-color: rgba(0, 242, 255, 0.55);
+  box-shadow: 0 0 10px rgba(0, 242, 255, 0.25);
+}
+[data-theme="light"] .hero-ed-strip-gap {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+[data-theme="light"] .hero-ed-strip-chunk {
+  background: linear-gradient(
+    180deg,
+    rgba(87, 82, 255, 0.22),
+    rgba(87, 82, 255, 0.12)
+  ) !important;
+  border: 1px solid rgba(87, 82, 255, 0.35) !important;
+}
+[data-theme="light"] .hero-ed-strip-chunk--active {
+  background: linear-gradient(180deg, rgba(87, 82, 255, 0.38), rgba(0, 194, 255, 0.2)) !important;
+  border-color: rgba(8, 145, 178, 0.55) !important;
+  box-shadow: 0 0 8px rgba(87, 82, 255, 0.2) !important;
+}
+
+/* 对话解析旁说明：紫色 i，浅色浮层黑字 */
+.hero-ed-infotip-trigger {
+  border: 1px solid rgba(167, 139, 250, 0.75);
+  color: #c4b5fd;
+  background: rgba(87, 82, 255, 0.12);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.hero-ed-infotip:hover .hero-ed-infotip-trigger {
+  border-color: rgba(167, 139, 250, 1);
+  color: #e9d5ff;
+  background: rgba(87, 82, 255, 0.2);
+}
+.hero-ed-infotip-bubble {
+  background: #f4f4f8;
+  color: #111827;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+[data-theme="light"] .hero-ed-infotip-trigger {
+  border-color: rgba(87, 82, 255, 0.55);
+  color: #5752ff;
+  background: rgba(87, 82, 255, 0.1);
+}
+[data-theme="light"] .hero-ed-infotip:hover .hero-ed-infotip-trigger {
+  border-color: #5752ff;
+  color: #4338ca;
+  background: rgba(87, 82, 255, 0.14);
+}
+[data-theme="light"] .hero-ed-infotip-bubble {
+  background: #ffffff;
+  color: #111827;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+[data-theme="light"] .hero-ed-timeline-meta {
+  color: #3a3a5a !important;
+}
+[data-theme="light"] .hero-ed-right {
+  background: #f3f4f8 !important;
+}
+[data-theme="light"] .hero-ed-right-title {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .hero-ed-lang-select {
+  background-color: #ffffff !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #1a1a2e !important;
+}
+
+/* EditorPane 语言下拉：未选灰色，选中为强调色 */
+.hero-ed-lang-option {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+.hero-ed-lang-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.hero-ed-lang-option--active {
+  color: #00f2ff;
+  font-weight: 600;
+  background: rgba(0, 242, 255, 0.08);
+}
+.hero-ed-lang-option--active:hover {
+  background: rgba(0, 242, 255, 0.12);
+}
+[data-theme="light"] .hero-ed-lang-option {
+  color: #64748b !important;
+}
+[data-theme="light"] .hero-ed-lang-option:hover {
+  background: rgba(87, 82, 255, 0.06) !important;
+}
+[data-theme="light"] .hero-ed-lang-option--active {
+  color: #5752ff !important;
+  background: rgba(87, 82, 255, 0.1) !important;
+}
+[data-theme="light"] .hero-ed-lang-option--active:hover {
+  background: rgba(87, 82, 255, 0.14) !important;
+}
+
+[data-theme="light"] .hero-ed-lang-translating {
+  background: rgba(87, 82, 255, 0.08) !important;
+  border-color: rgba(87, 82, 255, 0.25) !important;
+}
+[data-theme="light"] .hero-ed-spk {
+  color: rgba(30,30,60,0.5) !important;
+}
+[data-theme="light"] .hero-ed-range {
+  color: rgba(30,30,60,0.5) !important;
+}
+[data-theme="light"] .hero-ed-seg-active {
+  background: rgba(87,82,255,0.08) !important;
+}
+[data-theme="light"] .hero-ed-seg-active .hero-ed-range {
+  color: #5752ff !important;
+}
+
+/* 对话段落：播放按钮默认紫色（日间） */
+[data-theme="light"] .hero-ed-seg-play-btn:not(.hero-ed-seg-play-btn--active) {
+  background: rgba(87, 82, 255, 0.12) !important;
+  border: 1px solid rgba(87, 82, 255, 0.38) !important;
+  color: #5752ff !important;
+}
+[data-theme="light"] .hero-ed-seg-play-btn:not(.hero-ed-seg-play-btn--active):hover {
+  background: rgba(87, 82, 255, 0.18) !important;
+  border-color: rgba(87, 82, 255, 0.5) !important;
+}
+[data-theme="light"] .hero-ed-seg-play-btn--active {
+  background: rgba(0, 200, 230, 0.14) !important;
+  border: 1px solid rgba(0, 194, 255, 0.45) !important;
+  color: #0891b2 !important;
+}
+
+/* 台词区底部提示（日间：浅紫底字） */
+[data-theme="light"] .hero-ed-footnote {
+  background: rgba(87, 82, 255, 0.06) !important;
+  border: 1px solid rgba(87, 82, 255, 0.14) !important;
+}
+[data-theme="light"] .hero-ed-footnote-icon {
+  color: rgba(87, 82, 255, 0.55) !important;
+}
+[data-theme="light"] .hero-ed-footnote-text {
+  color: rgba(87, 82, 255, 0.72) !important;
+}
+[data-theme="light"] .hero-ed-footnote-link {
+  color: #5752ff !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+[data-theme="light"] .hero-ed-footnote-link:hover {
+  color: #4338ca !important;
+}
+/* 台词块进入编辑：夜间深底；日间浅底，与时间轴选中态区分 */
+.hero-ed-seg-editing {
+  background: #374559;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  box-sizing: border-box;
+}
+[data-theme="light"] .hero-ed-seg-editing,
+[data-theme="light"] .hero-ed-seg-active.hero-ed-seg-editing {
+  background: #f8fafc !important;
+  border: 1px solid rgba(87, 82, 255, 0.28) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 0 0 1px rgba(87, 82, 255, 0.06);
+}
+[data-theme="light"] .hero-ed-text-display {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .hero-ed-text-field {
+  background: #ffffff !important;
+  border-color: rgba(87,82,255,0.35) !important;
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .hero-ed-text-btn {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .hero-ed-edit-threshold-warn {
+  background: rgba(251, 191, 36, 0.14) !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+  color: #92400e !important;
+}
+[data-theme="light"] .hero-ed-seg-length-warn {
+  background: rgba(251, 191, 36, 0.14) !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+  color: #92400e !important;
+}
+[data-theme="light"] .hero-ed-hl {
+  background: rgba(87,82,255,0.18) !important;
+  color: #3a3a8a !important;
+}
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(87,82,255,0.18);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(87,82,255,0.32);
+}
+
+/* ── EditorPane buttons in light mode ───────────────────────── */
+/* Secondary: white bg + purple border + purple text */
+[data-theme="light"] .hero-ed-btn {
+  background: #ffffff !important;
+  border: 1px solid rgba(87,82,255,0.35) !important;
+  color: #5752ff !important;
+}
+[data-theme="light"] .hero-ed-btn:hover {
+  border-color: rgba(87,82,255,0.6) !important;
+  background: rgba(87,82,255,0.04) !important;
+}
+/* Undo/Redo icon buttons */
+[data-theme="light"] button[title="撤回"],
+[data-theme="light"] button[title="重做"] {
+  border-color: rgba(0,0,0,0.15) !important;
+  color: rgba(30,30,60,0.5) !important;
+}
+[data-theme="light"] button[title="撤回"]:not(:disabled):hover,
+[data-theme="light"] button[title="重做"]:not(:disabled):hover {
+  border-color: rgba(87,82,255,0.4) !important;
+  color: #5752ff !important;
+}
+
+/* ── App.tsx capsule light mode ─────────────────────────────── */
+/* 示例 button: purple scheme (text-accent-cyan/80 → purple) */
+[data-theme="light"] .text-accent-cyan\/80 {
+  color: #5752ff !important;
+}
+[data-theme="light"] .hover\:text-accent-cyan:hover {
+  color: #5752ff !important;
+}
+/* Category tab container */
+[data-theme="light"] .bg-white\/\[0\.03\] {
+  background-color: rgba(87,82,255,0.04) !important;
+  border-color: rgba(87,82,255,0.12) !important;
+}
+/* Category tab inactive: dark text (already handled in top-level .text-slate-400 override above) */
+/* Dropdown trigger buttons: dark text */
+[data-theme="light"] .btn-neon-border {
+  color: #1a1a2e !important;
+  background: rgba(255,255,255,0.8) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+[data-theme="light"] .btn-neon-border .text-slate-400 {
+  color: rgba(30,30,60,0.45) !important;
+}
+[data-theme="light"] .btn-neon-border .text-slate-600 {
+  color: rgba(30,30,60,0.35) !important;
+}
+[data-theme="light"] .btn-neon-border span.group-hover\:text-white {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .btn-neon-border:hover {
+  border-color: rgba(87,82,255,0.4) !important;
+  background: rgba(255,255,255,0.95) !important;
+}
+/* App 胶囊参数下拉：日间浅色浮层 + 深色字 */
+[data-theme="light"] .bg-\[#1A1B23\]\/95 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(87, 82, 255, 0.06) !important;
+}
+[data-theme="light"] .bg-\[#1A1B23\]\/95 .text-white {
+  color: #1a1a2e !important;
+}
+[data-theme="light"] .bg-\[#1A1B23\]\/95 button:hover {
+  background-color: rgba(87, 82, 255, 0.06) !important;
+}
+[data-theme="light"] .bg-\[#1A1B23\]\/95 .text-slate-400,
+[data-theme="light"] .bg-\[#1A1B23\]\/95 .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* 主按钮渐变上的文案：保持白色（避免全局 [light] .text-white 改成深色） */
+[data-theme="light"] .btn-primary-gradient {
+  color: #ffffff !important;
+}
+
+/* 对口型 Hero：主操作按钮 */
+[data-theme="light"] .hero-ed-btn-primary {
+  color: #ffffff !important;
+}
+
+/* MineCard 渐变操作按钮 */
+[data-theme="light"] .mine-action-gradient {
+  color: #ffffff !important;
+}
