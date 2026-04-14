@@ -1830,8 +1830,11 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
   }, [editing])
 
   const over = isLipsyncEditOverThreshold(seg.text, draft)
+  const lengthOver = seg.text.length > 0
+    ? Math.abs(draft.length - seg.text.length) / seg.text.length > 0.05
+    : false
   const noChange = draft === seg.text
-  const saveDisabled = noChange || over
+  const saveDisabled = noChange || over || lengthOver
 
   const startEdit = () => {
     if (translating) return
@@ -1886,6 +1889,11 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
           {over && (
             <p className="text-[10px] leading-relaxed px-0.5" style={{ color: 'rgba(251,191,36,0.95)' }}>
               修改幅度已超过 {Math.round(LIPSYNC_EDIT_DEVIATION_THRESHOLD * 100)}%（当前约 {Math.round(lipsyncEditDeviationRatio(seg.text, draft) * 100)}%），可能影响口型效果。<b>无法保存</b>，请精简改写或分段处理。
+            </p>
+          )}
+          {!over && lengthOver && (
+            <p className="text-[10px] leading-relaxed px-0.5" style={{ color: 'rgba(255,130,130,0.95)' }}>
+              文本长度变化超出限制（±5%），请返回修改后再保存
             </p>
           )}
           <div className="flex justify-end gap-2">
