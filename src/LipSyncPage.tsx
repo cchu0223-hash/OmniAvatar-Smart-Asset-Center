@@ -1001,21 +1001,6 @@ function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditCh
         </div>
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span className="hero-ed-range" style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{seg.range}</span>
-          {!disabled && (
-            <button
-              type="button"
-              className={isActive ? 'hero-ed-seg-play-btn hero-ed-seg-play-btn--active' : 'hero-ed-seg-play-btn'}
-              title={isActive ? '暂停' : '播放'}
-              onClick={e => { e.stopPropagation(); onPlayToggle() }}
-              style={{ width: '22px', height: '22px', borderRadius: '50%', background: isActive ? 'rgba(0,242,255,0.25)' : 'rgba(255,255,255,0.08)', border: isActive ? '1px solid rgba(0,242,255,0.5)' : '1px solid rgba(255,255,255,0.12)', color: isActive ? '#00f2ff' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-            >
-              {isActive ? (
-                <svg viewBox="0 0 12 14" width="9" height="10" aria-hidden><rect x="1" y="1" width="3.5" height="12" rx="0.5" fill="currentColor" /><rect x="7.5" y="1" width="3.5" height="12" rx="0.5" fill="currentColor" /></svg>
-              ) : (
-                <svg viewBox="0 0 15 17" fill="none" width="9" height="10" aria-hidden><path d="M1 1L14 8.5L1 16V1Z" fill="currentColor" /></svg>
-              )}
-            </button>
-          )}
         </span>
       </div>
 
