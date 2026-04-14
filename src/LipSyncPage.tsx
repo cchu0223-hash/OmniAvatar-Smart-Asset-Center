@@ -961,12 +961,15 @@ function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditCh
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => { if (isEditing) textareaRef.current?.focus() }, [isEditing])
 
-  const lengthOverThreshold = seg.text.length > 0
-    ? Math.abs(editText.length - seg.text.length) / seg.text.length > 0.05
-    : false
+  const [showLengthWarn, setShowLengthWarn] = useState(false)
 
   const handleSave = () => {
-    if (editText === seg.text || isSaving || lengthOverThreshold) return
+    if (editText === seg.text || isSaving) return
+    const lengthOver = seg.text.length > 0
+      ? Math.abs(editText.length - seg.text.length) / seg.text.length > 0.05
+      : false
+    if (lengthOver) { setShowLengthWarn(true); return }
+    setShowLengthWarn(false)
     onSavingChange(true)
     setTimeout(() => {
       onEditSave()
@@ -1040,7 +1043,7 @@ function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditCh
             className="hero-ed-text-field"
             style={{ width: '100%', padding: '10px 12px', fontSize: '14px', lineHeight: 1.55, background: 'var(--bg-input)', border: '1px solid var(--border-input)', borderRadius: '10px', color: 'var(--text-primary)', resize: 'none', outline: 'none', boxSizing: 'border-box', minHeight: '4.5em' }}
           />
-          {lengthOverThreshold && (
+          {showLengthWarn && (
             <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.45, padding: '7px 10px', borderRadius: '8px', background: 'rgba(255,76,76,0.1)', border: '1px solid rgba(255,76,76,0.35)', color: 'rgba(255,130,130,0.95)' }}>
               文本长度变化超出限制（±5%），请返回修改后再保存
             </p>
@@ -1049,10 +1052,10 @@ function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditCh
             <div style={{ flex: 1 }} />
             <button
               type="button"
-              disabled={editText === seg.text || isSaving || lengthOverThreshold}
+              disabled={editText === seg.text || isSaving}
               onClick={handleSave}
               className="hero-ed-text-btn"
-              style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'rgba(24,144,255,0.2)', border: '1px solid rgba(24,144,255,0.5)', color: '#7fd6ff', fontSize: '12px', cursor: editText === seg.text || isSaving || lengthOverThreshold ? 'not-allowed' : 'pointer', opacity: editText === seg.text || lengthOverThreshold ? 0.45 : 1, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'rgba(24,144,255,0.2)', border: '1px solid rgba(24,144,255,0.5)', color: '#7fd6ff', fontSize: '12px', cursor: editText === seg.text || isSaving ? 'not-allowed' : 'pointer', opacity: editText === seg.text ? 0.45 : 1, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
             >
               {isSaving && <span style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(127,214,255,0.35)', borderTopColor: '#7fd6ff', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />}
               {isSaving ? '保存中' : '保存'}

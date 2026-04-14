@@ -1815,6 +1815,7 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(seg.text)
+  const [showLengthWarn, setShowLengthWarn] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -1830,11 +1831,8 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
   }, [editing])
 
   const over = isLipsyncEditOverThreshold(seg.text, draft)
-  const lengthOver = seg.text.length > 0
-    ? Math.abs(draft.length - seg.text.length) / seg.text.length > 0.05
-    : false
   const noChange = draft === seg.text
-  const saveDisabled = noChange || over || lengthOver
+  const saveDisabled = noChange || over
 
   const startEdit = () => {
     if (translating) return
@@ -1844,6 +1842,11 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
 
   const save = () => {
     if (saveDisabled) return
+    const lengthOver = seg.text.length > 0
+      ? Math.abs(draft.length - seg.text.length) / seg.text.length > 0.05
+      : false
+    if (lengthOver) { setShowLengthWarn(true); return }
+    setShowLengthWarn(false)
     onSegmentChange(seg.id, draft)
     setEditing(false)
   }
@@ -1891,7 +1894,7 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
               修改幅度已超过 {Math.round(LIPSYNC_EDIT_DEVIATION_THRESHOLD * 100)}%（当前约 {Math.round(lipsyncEditDeviationRatio(seg.text, draft) * 100)}%），可能影响口型效果。<b>无法保存</b>，请精简改写或分段处理。
             </p>
           )}
-          {!over && lengthOver && (
+          {!over && showLengthWarn && (
             <p className="text-[10px] leading-relaxed px-0.5" style={{ color: 'rgba(255,130,130,0.95)' }}>
               文本长度变化超出限制（±5%），请返回修改后再保存
             </p>
