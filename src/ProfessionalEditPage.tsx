@@ -1862,7 +1862,7 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
         <span className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ backgroundColor: seg.refreshing ? 'rgba(0,240,255,0.1)' : 'rgba(255,255,255,0.06)', color: seg.refreshing ? '#00f0ff' : 'rgba(148,163,184,0.7)', border: `1px solid ${seg.refreshing ? 'rgba(0,240,255,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
           {seg.timeRange}
         </span>
-        <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{seg.speaker}</span>
+        <span className="text-[10px]" style={{ color: 'rgba(203,213,225,0.85)' }}>{seg.speaker}</span>
       </div>
       {!editing ? (
         <button
@@ -2007,20 +2007,20 @@ function LipSyncDonePanel({ onReplaceTrack, onReEdit }: { onReplaceTrack: () => 
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex flex-col gap-2.5 shrink-0">
+      <div className="flex flex-row gap-2.5 shrink-0">
         <button
           onClick={onReplaceTrack}
-          className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110"
+          className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110"
           style={{ background: 'linear-gradient(135deg,#7000ff,#0066FF)', boxShadow: '0 4px 14px rgba(0,102,255,0.35)' }}
         >
           一键替换轨道
         </button>
         <button
           onClick={onReEdit}
-          className="w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:bg-white/5"
+          className="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all hover:bg-white/5"
           style={{ borderColor: 'rgba(255,255,255,0.18)', color: 'rgba(203,213,225,0.9)' }}
         >
-          重新编辑
+          再做一条
         </button>
       </div>
     </div>
@@ -2062,6 +2062,7 @@ function LipSyncPanel({
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex-1" />
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-base" style={{ color: '#00f0ff' }} aria-hidden="true">record_voice_over</span>
           <span className="text-sm font-semibold text-white">AI对口型</span>
@@ -2153,15 +2154,11 @@ function LipSyncPanel({
         <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: 'none' }}>
           {/* 解析完成 + 语言选择：水平并列 */}
           <div className="mx-3 mt-3 mb-1 flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)' }}>
-              <span className="material-symbols-outlined text-sm" style={{ color: '#00f0ff', fontVariationSettings: '"FILL" 1' }} aria-hidden="true">check_circle</span>
-              <span className="text-xs whitespace-nowrap" style={{ color: '#a5f3fc' }}>解析完成</span>
-            </div>
-            <button onClick={onUndo} disabled={!canUndo} title="撤回" className="flex items-center justify-center rounded transition-colors" style={{ width: '24px', height: '24px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: canUndo ? 'rgba(148,163,184,0.8)' : 'rgba(255,255,255,0.2)', cursor: canUndo ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>undo</span>
+            <button onClick={onUndo} disabled={!canUndo} title="撤回" className="flex items-center justify-center rounded transition-colors" style={{ width: '32px', height: '32px', background: 'transparent', border: `1px solid ${canUndo ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`, color: canUndo ? 'rgba(203,213,225,1)' : 'rgba(255,255,255,0.2)', cursor: canUndo ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>undo</span>
             </button>
-            <button onClick={onRedo} disabled={!canRedo} title="重做" className="flex items-center justify-center rounded transition-colors" style={{ width: '24px', height: '24px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: canRedo ? 'rgba(148,163,184,0.8)' : 'rgba(255,255,255,0.2)', cursor: canRedo ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>redo</span>
+            <button onClick={onRedo} disabled={!canRedo} title="重做" className="flex items-center justify-center rounded transition-colors" style={{ width: '32px', height: '32px', background: 'transparent', border: `1px solid ${canRedo ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`, color: canRedo ? 'rgba(203,213,225,1)' : 'rgba(255,255,255,0.2)', cursor: canRedo ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>redo</span>
             </button>
             <div ref={langDropdownRef} className="relative flex-1">
               <button
@@ -2175,7 +2172,7 @@ function LipSyncPanel({
                 <span className="material-symbols-outlined text-xs" style={{ transform: showLangDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} aria-hidden="true">expand_more</span>
               </button>
               {showLangDropdown && (
-                <div className="absolute right-0 mt-1 min-w-[180px] w-max max-w-[min(100vw-1rem,240px)] rounded-lg shadow-2xl overflow-hidden z-50" style={{ backgroundColor: '#1A1B23', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="absolute left-0 right-0 mt-1 w-full rounded-lg shadow-2xl overflow-hidden z-50" style={{ backgroundColor: '#1A1B23', border: '1px solid rgba(255,255,255,0.1)' }}>
                   {LIPSYNC_TARGET_LANGUAGES.map(l => (
                     <button key={l} onClick={() => onLangChange(l)} className="w-full px-3 py-2.5 text-left text-xs transition-colors flex items-center justify-between gap-2" style={{ color: lang === l ? '#0066FF' : 'rgba(203,213,225,0.9)', fontWeight: lang === l ? 700 : 400 }} onMouseEnter={e => { if (lang !== l) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}>
                       {l}
