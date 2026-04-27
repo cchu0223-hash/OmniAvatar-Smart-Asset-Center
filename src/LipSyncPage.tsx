@@ -84,46 +84,54 @@ export default function LipSyncPage() {
   const [showSubmitBanner, setShowSubmitBanner] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [parseProgress, setParseProgress] = useState(0)
-  // typewriter: how many chars of each segment text are revealed
-  const [twRevealed, setTwRevealed] = useState<number[]>([])
+  const [sourceLang, setSourceLang] = useState<'中文' | '英文'>('中文')
   const [selectedLang, setSelectedLang] = useState('英语 · EN')
   const [langTranslating, setLangTranslating] = useState(false)
   const langTransTimerRef = useRef<number | null>(null)
   const [segments, setSegments] = useState(SEGMENTS)
-  const [segHistory, setSegHistory] = useState<typeof SEGMENTS[]>([SEGMENTS])
+  const [segHistory, setSegHistory] = useState<Array<{ segs: typeof SEGMENTS; lang: string }>>([{ segs: SEGMENTS, lang: '英语 · EN' }])
   const [segHistIdx, setSegHistIdx] = useState(0)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploadedFileName, setUploadedFileName] = useState('上传视频.mp4')
   const [durationWarning, setDurationWarning] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [hasExceededLimit, setHasExceededLimit] = useState(false)
-  const [warningMessage, setWarningMessage] = useState('')
+  const [isValidating, setIsValidating] = useState(false)
+  const [validationError, setValidationError] = useState('')
+  const [hasShownEditTip, setHasShownEditTip] = useState(false)
+  const [showEditTipModal, setShowEditTipModal] = useState(false)
+  const [showDraftBanner, setShowDraftBanner] = useState(false)
 
   // ── 阈值配置 ──
   const MAX_SEGMENT_LENGTH = 200
-  const MAX_TOTAL_LENGTH = 2000
 
-  // ── 检测字数限制 ──
-  const checkLimits = (segs: typeof SEGMENTS) => {
-    const totalLength = segs.reduce((sum, s) => sum + s.text.length, 0)
-    const longSegment = segs.find(s => s.text.length > MAX_SEGMENT_LENGTH)
+  // ── 文字转语音时间判断 ──
+  const validateAllSegments = (): Promise<{ success: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Mock 验证逻辑：检查每个片段的文本长度是否合理
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i]
+          const { start, end } = parseRange(seg.range)
+          const duration = end - start
+          const textLength = seg.text.length
 
-    if (totalLength > MAX_TOTAL_LENGTH) {
-      setHasExceededLimit(true)
-      setWarningMessage(`总字数 ${totalLength} 超出限制 ${MAX_TOTAL_LENGTH}，请精简内容`)
-      return false
-    }
-    if (longSegment) {
-      setHasExceededLimit(true)
-      setWarningMessage('')
-      return false
-    }
+          // Mock 规则：每秒最多 8 个字符，最少 1 个字符
+          const maxChars = duration * 8
+          const minChars = duration * 1
 
-    setHasExceededLimit(false)
-    setWarningMessage('')
-    return true
+          if (textLength > maxChars || textLength < minChars) {
+            resolve({
+              success: false,
+              error: `第 ${i + 1} 段文本时长不匹配，请调整文本长度`
+            })
+            return
+          }
+        }
+
+        resolve({ success: true })
+      }, 10000) // 10秒后返回结果
+    })
   }
 
   // ── uploading: progress bar ──
@@ -136,7 +144,7 @@ export default function LipSyncPage() {
       if (p >= 100) {
         clearInterval(iv)
         setUploadProgress(100)
-        setTimeout(() => { setStage('parsing'); setParseProgress(0); setTwRevealed([]) }, 300)
+        setTimeout(() => { setStage('parsing'); setParseProgress(0) }, 300)
       } else {
         setUploadProgress(p)
       }
@@ -144,41 +152,21 @@ export default function LipSyncPage() {
     return () => clearInterval(iv)
   }, [stage])
 
-  // ── parsing: typewriter per segment ──
+  // ── parsing: progress ring → editing ──
   useEffect(() => {
     if (stage !== 'parsing') return
-    // Phase 1: parse progress bar 0→100 (2s)
     let p = 0
     const parseIv = setInterval(() => {
       p += Math.random() * 6 + 3
-      if (p >= 100) { clearInterval(parseIv); setParseProgress(100) }
-      else setParseProgress(p)
+      if (p >= 100) {
+        clearInterval(parseIv)
+        setParseProgress(100)
+        setTimeout(() => setStage('editing'), 500)
+      } else {
+        setParseProgress(p)
+      }
     }, 120)
-
-    // Phase 2: typewriter segments start after 1s
-    const segs = SEGMENTS
-    const totalChars = segs.reduce((a, s) => a + s.text.length, 0)
-    const msPerChar = 2800 / totalChars // spread over ~2.8s
-    let segIdx = 0
-    let charIdx = 0
-    const revealed = segs.map(() => 0)
-
-    const startTw = setTimeout(() => {
-      const twIv = setInterval(() => {
-        if (segIdx >= segs.length) { clearInterval(twIv); return }
-        charIdx++
-        revealed[segIdx] = charIdx
-        setTwRevealed([...revealed])
-        if (charIdx >= segs[segIdx].text.length) {
-          segIdx++
-          charIdx = 0
-          if (segIdx >= segs.length) { clearInterval(twIv); setTimeout(() => setStage('editing'), 500) }
-        }
-      }, msPerChar)
-      return () => clearInterval(twIv)
-    }, 1000)
-
-    return () => { clearInterval(parseIv); clearTimeout(startTw) }
+    return () => clearInterval(parseIv)
   }, [stage])
 
   // ── task progress simulation ──
@@ -225,10 +213,27 @@ export default function LipSyncPage() {
   const handleCancelEdit = () => { setStage('idle') }
   const handleSaveDraft = () => {
     setTasks(prev => [{ id: Date.now().toString(), name: uploadedFileName, status: 'draft', progress: 0, targetLanguage: selectedLang.split(' · ')[0], duration: '1m20s', createdAt: Date.now(), savedSegments: segments }, ...prev])
+    setSegHistory([{ segs: segments, lang: selectedLang }])
+    setSegHistIdx(0)
     setStage('idle')
     setActiveTab('mine')
+    setShowDraftBanner(true)
+    setTimeout(() => setShowDraftBanner(false), 4000)
   }
-  const handleGenerateVideo = () => {
+  const handleGenerateVideo = async () => {
+    setIsValidating(true)
+    setValidationError('')
+
+    const result = await validateAllSegments()
+
+    setIsValidating(false)
+
+    if (!result.success) {
+      setValidationError(result.error || '验证失败')
+      return
+    }
+
+    // 验证成功，提交合成任务
     setTasks(prev => [{ id: Date.now().toString(), name: uploadedFileName, status: 'processing', progress: 0, targetLanguage: selectedLang.split(' · ')[0], duration: '1m20s', createdAt: Date.now() }, ...prev])
     setStage('idle')
     setActiveTab('mine')
@@ -242,7 +247,7 @@ export default function LipSyncPage() {
     setLangTranslating(false)
     if (task.savedSegments) {
       setSegments(task.savedSegments)
-      setSegHistory([task.savedSegments])
+      setSegHistory([{ segs: task.savedSegments, lang: selectedLang }])
       setSegHistIdx(0)
     }
     setUploadedFileName(task.name)
@@ -253,14 +258,15 @@ export default function LipSyncPage() {
   const handleSegmentEdit = (id: number, text: string) => {
     setSegments(prev => {
       const next = prev.map(s => s.id === id ? { ...s, text } : s)
-      checkLimits(next)
-      setSegHistory(h => { const nh = h.slice(0, segHistIdx + 1); nh.push(next); return nh })
+      setSegHistory(h => { const nh = h.slice(0, segHistIdx + 1); nh.push({ segs: next, lang: selectedLang }); return nh })
       setSegHistIdx(i => i + 1)
       return next
     })
+    // 修改文本后清除验证错误
+    setValidationError('')
   }
 
-  /** 切换目标语言：展示翻译中 → Mock 覆盖台词；写入历史栈，可点撤回撤销本次翻译 */
+  /** 切换目标语言：展示翻译中 → Mock 覆盖台词；翻译作为独立节点追加到历史栈，支持撤回 */
   const handleSelectLang = (l: string) => {
     if (l === selectedLang || langTranslating) return
     if (langTransTimerRef.current != null) window.clearTimeout(langTransTimerRef.current)
@@ -269,35 +275,37 @@ export default function LipSyncPage() {
     setLangTranslating(true)
     langTransTimerRef.current = window.setTimeout(() => {
       langTransTimerRef.current = null
-      setSegments(prev => {
-        const next = SEGMENTS_FOR_LANG[l] ?? prev
-        setSegHistIdx(idx => {
-          setSegHistory(h => {
-            const nh = h.slice(0, idx + 1)
-            nh.push(next)
-            return nh
-          })
-          return idx + 1
-        })
-        return next
+      const next = SEGMENTS_FOR_LANG[l] ?? segments
+      setSegments(next)
+      // 翻译作为独立节点追加到历史栈，可以撤回
+      setSegHistIdx(idx => {
+        const ni = idx + 1
+        setSegHistory(h => { const nh = h.slice(0, idx + 1); nh.push({ segs: next, lang: l }); return nh })
+        return ni
       })
       setLangTranslating(false)
     }, 1400)
   }
   const handleSegUndo = () => {
     if (segHistIdx <= 0) return
-    const ni = segHistIdx - 1; setSegHistIdx(ni); setSegments(segHistory[ni])
+    const ni = segHistIdx - 1
+    setSegHistIdx(ni)
+    setSegments(segHistory[ni].segs)
+    setSelectedLang(segHistory[ni].lang)
   }
   const handleSegRedo = () => {
     if (segHistIdx >= segHistory.length - 1) return
-    const ni = segHistIdx + 1; setSegHistIdx(ni); setSegments(segHistory[ni])
+    const ni = segHistIdx + 1
+    setSegHistIdx(ni)
+    setSegments(segHistory[ni].segs)
+    setSelectedLang(segHistory[ni].lang)
   }
 
   // ZTK from card: skip upload/parsing, go directly to editing with preset segments
   const handleZtkFromCard = (card: typeof CARDS[0]) => {
     setUploadedFileName(card.title + '.mp4')
     setSegments(SEGMENTS)
-    setSegHistory([SEGMENTS])
+    setSegHistory([{ segs: SEGMENTS, lang: '英语 · EN' }])
     setSegHistIdx(0)
     setSelectedLang('英语 · EN')
     setLangTranslating(false)
@@ -353,8 +361,8 @@ export default function LipSyncPage() {
         <main style={{ maxWidth: '1267px', margin: '0 auto', padding: '0 32px 60px' }}>
           <section style={{ paddingTop: '48px', minHeight: '520px' }}>
 
-            {/* IDLE */}
-            <div style={{ display: stage === 'idle' ? 'grid' : 'none', gridTemplateColumns: '1fr min(536px,48%)', gap: '40px', alignItems: 'center' }}>
+            {/* HERO grid — idle / uploading / parsing */}
+            <div style={{ display: stage !== 'editing' ? 'grid' : 'none', gridTemplateColumns: '1fr min(536px,48%)', gap: '40px', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
                   <img src="/title-logo.gif" alt="" style={{ width: '62px', height: '62px', flexShrink: 0 }} />
@@ -363,45 +371,107 @@ export default function LipSyncPage() {
                     <p className="lipsync-subtitle" style={{ fontSize: '18px', fontWeight: 400, color: 'rgba(112,207,255,0.65)', margin: 0 }}>多语种真实 AI对口型视频，让您的视频全球发声。</p>
                   </div>
                 </div>
-                <UploadCard isDragOver={isDragOver} onDragOver={() => setIsDragOver(true)} onDragLeave={() => setIsDragOver(false)} onDrop={() => { setIsDragOver(false); handleUpload() }} onUpload={handleUpload} />
-                {durationWarning && (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fbbf24', flexShrink: 0, marginTop: '1px' }}>warning</span>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '13px', color: 'rgba(251,191,36,0.9)', lineHeight: 1.5 }}>视频时长超过 5min，建议前往<button type="button" onClick={() => navigate('/professional-edit')} style={{ background: 'none', border: 'none', color: '#00f2ff', fontSize: '13px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>专业剪辑</button>分段进行 AI对口型</p>
+
+                {/* Upload card — only in idle */}
+                {stage === 'idle' && (
+                  <>
+                    <UploadCard isDragOver={isDragOver} onDragOver={() => setIsDragOver(true)} onDragLeave={() => setIsDragOver(false)} onDrop={() => { setIsDragOver(false); handleUpload() }} onUpload={handleUpload} />
+                    <SourceLangSelector sourceLang={sourceLang} onSourceLangChange={setSourceLang} />
+                    {durationWarning && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fbbf24', flexShrink: 0, marginTop: '1px' }}>warning</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: '13px', color: 'rgba(251,191,36,0.9)', lineHeight: 1.5 }}>视频时长超过 5min，建议前往<button type="button" onClick={() => navigate('/professional-edit')} style={{ background: 'none', border: 'none', color: '#00f2ff', fontSize: '13px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>专业剪辑</button>分段进行 AI对口型</p>
+                        </div>
+                        <button onClick={() => setDurationWarning(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Uploading inline state */}
+                {stage === 'uploading' && (
+                  <div style={{ width: '100%', maxWidth: '602px', background: 'var(--bg-card)', backdropFilter: 'blur(22px)', border: '1px solid var(--border-card)', borderRadius: '18px', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #00f2ff', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>上传中… {Math.round(uploadProgress)}%</span>
+                      <span style={{ marginLeft: 'auto', fontSize: '13px', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{uploadedFileName}</span>
                     </div>
-                    <button onClick={() => setDurationWarning(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                    </button>
+                    <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg,rgba(0,242,255,0.8),rgba(59,130,246,0.8))', borderRadius: '3px', transition: 'width 0.12s ease' }} />
+                    </div>
+                    <button onClick={handleCancelParsing} style={{ alignSelf: 'flex-start', height: '32px', padding: '0 16px', borderRadius: '8px', background: 'var(--bg-panel)', border: '1px solid var(--border-main)', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>取消上传</button>
+                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                  </div>
+                )}
+
+                {/* Parsing inline state */}
+                {stage === 'parsing' && (
+                  <div style={{ width: '100%', maxWidth: '602px', background: 'var(--bg-card)', backdropFilter: 'blur(22px)', border: '1px solid var(--border-card)', borderRadius: '18px', padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                    <div style={{ position: 'relative', width: '80px', height: '80px' }}>
+                      <svg width="80" height="80" viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
+                        <circle cx="40" cy="40" r="32" fill="none" stroke="url(#parseGrad)" strokeWidth="5" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 32}`}
+                          strokeDashoffset={`${2 * Math.PI * 32 * (1 - parseProgress / 100)}`}
+                          style={{ transition: 'stroke-dashoffset 0.2s ease' }}
+                        />
+                        <defs>
+                          <linearGradient id="parseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="#7000ff" />
+                            <stop offset="100%" stopColor="#00f2ea" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#00f2ff' }}>{Math.round(parseProgress)}%</span>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>视频解析中…</p>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-dim)' }}>{uploadedFileName}</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={handleCancelParsing} style={{ height: '32px', padding: '0 16px', borderRadius: '8px', background: 'var(--bg-panel)', border: '1px solid var(--border-main)', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>取消解析</button>
+                      <button onClick={handleBgParsing} style={{ height: '32px', padding: '0 16px', borderRadius: '8px', background: 'var(--bg-panel)', border: '1px solid var(--border-main)', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>后台解析</button>
+                    </div>
                   </div>
                 )}
               </div>
               <DemoVideoCard />
             </div>
 
-            {/* EDITOR pane */}
-            {stage !== 'idle' && (
+            {/* EDITOR pane — editing only */}
+            {stage === 'editing' && (
               <EditorPane
                 stage={stage}
                 fileName={uploadedFileName}
                 uploadProgress={uploadProgress}
                 parseProgress={parseProgress}
-                twRevealed={twRevealed}
+                sourceLang={sourceLang}
                 selectedLang={selectedLang}
                 langTranslating={langTranslating}
                 onLangChange={handleSelectLang}
                 segments={segments}
                 editingId={editingId}
                 editText={editText}
-                onEditStart={(id, text) => { setEditingId(id); setEditText(text) }}
+                onEditStart={(id, text) => {
+                  if (!hasShownEditTip) {
+                    setShowEditTipModal(true)
+                    setHasShownEditTip(true)
+                  }
+                  setEditingId(id)
+                  setEditText(text)
+                }}
                 onEditChange={setEditText}
                 onEditSave={(id) => { handleSegmentEdit(id, editText); setEditingId(null) }}
                 onEditCancel={() => setEditingId(null)}
-                isSaving={isSaving}
-                onSavingChange={setIsSaving}
-                hasExceededLimit={hasExceededLimit}
-                warningMessage={warningMessage}
                 maxSegmentChars={MAX_SEGMENT_LENGTH}
+                isValidating={isValidating}
+                validationError={validationError}
+                showEditTipModal={showEditTipModal}
+                onCloseEditTipModal={() => setShowEditTipModal(false)}
+                theme={theme}
                 onCancelParsing={handleCancelParsing}
                 onBgParsing={handleBgParsing}
                 onCancelEdit={handleCancelEdit}
@@ -411,7 +481,6 @@ export default function LipSyncPage() {
                 onRedo={handleSegRedo}
                 canUndo={segHistIdx > 0}
                 canRedo={segHistIdx < segHistory.length - 1}
-                onNavigateProEdit={() => navigate('/professional-edit')}
               />
             )}
           </section>
@@ -440,6 +509,12 @@ export default function LipSyncPage() {
 
               {activeTab === 'mine' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {showDraftBanner && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'rgba(0,242,234,0.08)', border: '1px solid rgba(0,242,234,0.25)', marginBottom: '4px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#00f2ea', flexShrink: 0 }}>check_circle</span>
+                      <span style={{ fontSize: '13px', color: 'rgba(203,213,225,0.9)' }}>草稿已保存至「我的合成」，可随时重新编辑。</span>
+                    </div>
+                  )}
                   {showSubmitBanner && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', backgroundColor: 'rgba(0,242,234,0.08)', border: '1px solid rgba(0,242,234,0.25)', marginBottom: '4px' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#00f2ea', flexShrink: 0 }}>check_circle</span>
@@ -494,24 +569,48 @@ function TypewriterTitle() {
 }
 
 // ── UploadCard ──
-function UploadCard({ isDragOver, onDragOver, onDragLeave, onDrop, onUpload }: { isDragOver: boolean; onDragOver: () => void; onDragLeave: () => void; onDrop: () => void; onUpload: () => void }) {
+function UploadCard({ isDragOver, onDragOver, onDragLeave, onDrop, onUpload }: {
+  isDragOver: boolean; onDragOver: () => void; onDragLeave: () => void; onDrop: () => void; onUpload: () => void
+}) {
   return (
     <div onDragOver={e => { e.preventDefault(); onDragOver() }} onDragLeave={onDragLeave} onDrop={e => { e.preventDefault(); onDrop() }}
       className="upload-card"
-      style={{ width: '100%', maxWidth: '602px', height: '258px', background: 'var(--bg-card)', backdropFilter: 'blur(22px) saturate(1.2)', border: `1px solid ${isDragOver ? 'rgba(24,144,255,0.65)' : 'var(--border-card)'}`, borderRadius: '18px', display: 'flex', flexDirection: 'column', transition: 'border-color 0.2s,box-shadow 0.2s', boxShadow: isDragOver ? '0 0 0 3px rgba(24,144,255,0.18),0 20px 60px rgba(0,0,0,0.4)' : 'var(--shadow-card)', cursor: 'pointer', overflow: 'hidden' }}
+      style={{ width: '100%', maxWidth: '602px', background: 'var(--bg-card)', backdropFilter: 'blur(22px) saturate(1.2)', border: `1px solid ${isDragOver ? 'rgba(24,144,255,0.65)' : 'var(--border-card)'}`, borderRadius: '18px', display: 'flex', flexDirection: 'column', transition: 'border-color 0.2s,box-shadow 0.2s', boxShadow: isDragOver ? '0 0 0 3px rgba(24,144,255,0.18),0 20px 60px rgba(0,0,0,0.4)' : 'var(--shadow-card)', cursor: 'pointer', overflow: 'hidden', padding: '32px 24px' }}
       onClick={onUpload}
       onMouseEnter={e => { if (!isDragOver) { e.currentTarget.style.borderColor = 'var(--border-card-hover)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(24,144,255,0.12),0 20px 60px rgba(0,0,0,0.4)' } }}
       onMouseLeave={e => { if (!isDragOver) { e.currentTarget.style.borderColor = 'var(--border-card)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)' } }}
     >
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '24px' }}>
-        <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.15))', border: '1px solid rgba(0,242,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#00f2ff' }}>upload_file</span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.15))', border: '1px solid rgba(0,242,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '28px', color: '#00f2ff' }}>upload_file</span>
         </div>
-        <p className="upload-main-text" style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-bright)', margin: 0 }}>点击上传视频</p>
-        <p className="upload-formats" style={{ fontSize: '12px', color: 'var(--text-dim)', margin: 0 }}>支持 mp4、mov 格式，时长不超过 5min</p>
+        <p className="upload-main-text" style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-bright)', margin: 0 }}>点击上传视频</p>
+        <p className="upload-formats" style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>支持 mp4、mov 格式，时长不超过 5min</p>
       </div>
-      <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px' }}>
-        <button onClick={e => { e.stopPropagation(); onUpload() }} style={{ flex: 1, height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.12))', border: '1px solid rgba(0,242,255,0.3)', color: '#00f2ff', fontSize: '14px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,242,255,0.2)'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.12))'; e.currentTarget.style.transform = 'none' }}>上传视频</button>
+      <button onClick={e => { e.stopPropagation(); onUpload() }} style={{ marginTop: '20px', width: '100%', height: '44px', borderRadius: '10px', background: 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.12))', border: '1px solid rgba(0,242,255,0.3)', color: '#00f2ff', fontSize: '14px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,242,255,0.2)'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg,rgba(0,242,255,0.15),rgba(59,130,246,0.12))'; e.currentTarget.style.transform = 'none' }}>上传视频</button>
+    </div>
+  )
+}
+
+// ── SourceLangSelector ──
+const SOURCE_LANGS = ['中文', '英文'] as const
+function SourceLangSelector({ sourceLang, onSourceLangChange }: {
+  sourceLang: '中文' | '英文'; onSourceLangChange: (l: '中文' | '英文') => void
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '602px' }}>
+      <span style={{ fontSize: '13px', color: 'var(--text-secondary)', flexShrink: 0 }}>当前视频语种：</span>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {SOURCE_LANGS.map(l => {
+          const active = sourceLang === l
+          return (
+            <button
+              key={l}
+              onClick={() => onSourceLangChange(l)}
+              style={{ height: '32px', padding: '0 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', border: active ? '1px solid rgba(0,242,255,0.6)' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(0,242,255,0.12)' : 'transparent', color: active ? '#00f2ff' : 'var(--text-dim)' }}
+            >{l}</button>
+          )
+        })}
       </div>
     </div>
   )
@@ -580,18 +679,19 @@ function buildTimelinePieces(segs: typeof SEGMENTS, totalDur: number): Array<{ k
 }
 
 // ── EditorPane ──
-function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed, selectedLang, langTranslating, onLangChange, segments, editingId, editText, onEditStart, onEditChange, onEditSave, onEditCancel, isSaving, onSavingChange, hasExceededLimit, warningMessage, maxSegmentChars, onCancelParsing, onBgParsing, onCancelEdit, onSaveDraft, onGenerateVideo, onUndo, onRedo, canUndo, canRedo, onNavigateProEdit }: {
-  stage: LipSyncStage; fileName: string; uploadProgress: number; parseProgress: number; twRevealed: number[]
+function EditorPane({ stage, fileName, uploadProgress, parseProgress, sourceLang, selectedLang, langTranslating, onLangChange, segments, editingId, editText, onEditStart, onEditChange, onEditSave, onEditCancel, maxSegmentChars, isValidating, validationError, showEditTipModal, onCloseEditTipModal, theme, onCancelParsing, onBgParsing, onCancelEdit, onSaveDraft, onGenerateVideo, onUndo, onRedo, canUndo, canRedo }: {
+  stage: LipSyncStage; fileName: string; uploadProgress: number; parseProgress: number; sourceLang: '中文' | '英文'
   selectedLang: string; langTranslating: boolean; onLangChange: (l: string) => void; segments: typeof SEGMENTS
   editingId: number | null; editText: string
   onEditStart: (id: number, text: string) => void; onEditChange: (t: string) => void
   onEditSave: (id: number) => void; onEditCancel: () => void
-  isSaving: boolean; onSavingChange: (v: boolean) => void
-  hasExceededLimit: boolean; warningMessage: string; maxSegmentChars: number
+  maxSegmentChars: number
+  isValidating: boolean; validationError: string
+  showEditTipModal: boolean; onCloseEditTipModal: () => void
+  theme: Theme
   onCancelParsing: () => void; onBgParsing: () => void
   onCancelEdit: () => void; onSaveDraft: () => void; onGenerateVideo: () => void
   onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean
-  onNavigateProEdit: () => void
 }) {
   const [showLangDrop, setShowLangDrop] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -675,6 +775,11 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
             <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #00f2ff', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
           )}
           <span className="hero-editor-filename" style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topLabel}</span>
+          {stage === 'parsing' && (
+            <span style={{ flexShrink: 0, fontSize: '12px', fontWeight: 500, padding: '2px 10px', borderRadius: '999px', border: '1px solid rgba(0,242,255,0.35)', background: 'rgba(0,242,255,0.08)', color: '#00f2ff' }}>
+              {sourceLang === '中文' ? '中文 · ZH' : '英语 · EN'}
+            </span>
+          )}
         </div>
         {/* AI Watermark toggle — only in editing stage */}
         {stage === 'editing' && (
@@ -701,9 +806,9 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
           )}
           {stage === 'editing' && (
             <>
-              <EdBtn onClick={onCancelEdit}>取消合成</EdBtn>
-              <EdBtn onClick={onSaveDraft}>保存草稿</EdBtn>
-              <EdBtn primary onClick={onGenerateVideo} disabled={hasExceededLimit || isSaving || editingId !== null}>合成视频</EdBtn>
+              <EdBtn onClick={onCancelEdit} disabled={isValidating}>取消合成</EdBtn>
+              <EdBtn onClick={onSaveDraft} disabled={editingId !== null}>保存草稿</EdBtn>
+              <EdBtn primary onClick={onGenerateVideo} disabled={isValidating || editingId !== null}>合成视频</EdBtn>
             </>
           )}
         </div>
@@ -853,6 +958,23 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
             </div>
           )}
 
+          {/* 验证状态提示 */}
+          {stage === 'editing' && isValidating && (
+            <div className="hero-ed-validating" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,242,255,0.08)', border: '1px solid rgba(0,242,255,0.22)' }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid rgba(0,242,255,0.35)', borderTopColor: '#00f2ff', animation: 'spin 0.75s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary2)' }}>当前文本判断中…</span>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+          )}
+
+          {/* 验证失败提示 */}
+          {stage === 'editing' && !isValidating && validationError && (
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,76,76,0.08)', border: '1px solid rgba(255,76,76,0.28)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#ff4c4c', flexShrink: 0, marginTop: '1px', fontVariationSettings: '"FILL" 1' }}>error</span>
+              <span style={{ fontSize: '12px', color: 'rgba(255,130,130,0.95)', lineHeight: 1.5 }}>{validationError}</span>
+            </div>
+          )}
+
           <div className="hero-ed-right-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* Segments */}
             {stage === 'uploading' && (
@@ -861,15 +983,7 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
               </div>
             )}
 
-            {/* 总字数超限：顶栏提示 */}
-            {stage === 'editing' && hasExceededLimit && warningMessage !== '' && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)', flexShrink: 0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#fbbf24', flexShrink: 0, marginTop: '1px', fontVariationSettings: '"FILL" 1' }}>warning</span>
-                <span style={{ fontSize: '12px', color: 'rgba(251,191,36,0.9)', lineHeight: 1.5 }}>{warningMessage}，合成视频已暂停</span>
-              </div>
-            )}
-
-            {(stage === 'parsing' || stage === 'editing') && segments.map((seg, si) => (
+            {(stage === 'parsing' || stage === 'editing') && segments.map((seg) => (
               <SegmentItem
                 key={seg.id}
                 seg={seg}
@@ -883,29 +997,31 @@ function EditorPane({ stage, fileName, uploadProgress, parseProgress, twRevealed
                 onEditChange={onEditChange}
                 onEditSave={() => onEditSave(seg.id)}
                 onEditCancel={onEditCancel}
-                isSaving={isSaving}
-                onSavingChange={onSavingChange}
-                revealedChars={stage === 'parsing' ? (twRevealed[si] ?? 0) : seg.text.length}
+                revealedChars={seg.text.length}
                 disabled={stage === 'parsing' || (stage === 'editing' && langTranslating)}
-                onPlayToggle={() => handleSegPlayToggle(seg.id)}
                 maxSegmentChars={maxSegmentChars}
                 showSavedLengthWarn={stage === 'editing'}
               />
             ))}
           </div>
-
-          {stage === 'editing' && (
-            <div className="hero-ed-footnote" style={{ flexShrink: 0, padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-              <span className="material-symbols-outlined hero-ed-footnote-icon" style={{ fontSize: '14px', color: 'var(--text-muted)', flexShrink: 0, marginTop: '1px' }}>info</span>
-              <p className="hero-ed-footnote-text" style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
-                如发现解析不准确，您可前往
-                <button type="button" className="hero-ed-footnote-link" onClick={onNavigateProEdit} style={{ background: 'none', border: 'none', color: 'rgba(0,242,255,0.6)', fontSize: '12px', cursor: 'pointer', padding: 0 }}>「专业剪辑」</button>
-                （可点击跳转），将原视频导入并插入轨道，手动分段后，逐段右键进行 AI对口型，进一步提高准确率。
-              </p>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* 首次编辑提示弹窗 */}
+      {showEditTipModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(5,10,20,0.75)', backdropFilter: 'blur(8px)' }} onClick={onCloseEditTipModal}>
+          <div style={{ position: 'relative', width: 'min(420px,90vw)', borderRadius: '16px', background: theme === 'light' ? 'linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))' : 'linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.98))', padding: '24px', border: theme === 'light' ? '1px solid rgba(0,242,255,0.3)' : '1px solid rgba(0,242,255,0.2)', boxShadow: theme === 'light' ? '0 24px 60px rgba(0,0,0,0.15)' : '0 24px 60px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#00f2ff', flexShrink: 0, fontVariationSettings: '"FILL" 1' }}>info</span>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: theme === 'light' ? '#1e293b' : 'var(--text-primary)' }}>编辑提示</h3>
+                <p style={{ margin: 0, fontSize: '14px', color: theme === 'light' ? '#64748b' : 'var(--text-secondary2)', lineHeight: 1.6 }}>修改后文本与原文本长度尽量相近，否则无法送入合成。</p>
+              </div>
+            </div>
+            <button onClick={onCloseEditTipModal} style={{ width: '100%', height: '40px', borderRadius: '10px', background: 'linear-gradient(90deg,rgba(0,242,255,0.15),rgba(59,130,246,0.15))', border: '1px solid rgba(0,242,255,0.3)', color: '#00f2ff', fontSize: '14px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,242,255,0.25)' }} onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(90deg,rgba(0,242,255,0.15),rgba(59,130,246,0.15))' }}>我知道了</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -950,31 +1066,21 @@ function EdBtn({ children, primary, onClick, disabled }: { children: React.React
 }
 
 // ── SegmentItem ──
-function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditChange, onEditSave, onEditCancel, isSaving, onSavingChange, revealedChars, disabled, onPlayToggle, maxSegmentChars, showSavedLengthWarn }: {
+function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditChange, onEditSave, onEditCancel, revealedChars, disabled, maxSegmentChars, showSavedLengthWarn }: {
   seg: typeof SEGMENTS[0]; isEditing: boolean; isActive: boolean; editText: string
   onEditStart: () => void; onEditChange: (t: string) => void; onEditSave: () => void; onEditCancel: () => void
-  isSaving: boolean; onSavingChange: (v: boolean) => void
-  revealedChars: number; disabled: boolean; onPlayToggle: () => void; maxSegmentChars: number
+  revealedChars: number; disabled: boolean; maxSegmentChars: number
   /** 为 false 时不展示单段字数警告（解析阶段）；仅展示已保存文本 seg.text 的超限，编辑中不提示 */
   showSavedLengthWarn: boolean
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => { if (isEditing) textareaRef.current?.focus() }, [isEditing])
 
-  const [showLengthWarn, setShowLengthWarn] = useState(false)
-
-  const handleSave = () => {
-    if (editText === seg.text || isSaving) return
-    const lengthOver = seg.text.length > 0
-      ? Math.abs(editText.length - seg.text.length) / seg.text.length > 0.05
-      : false
-    if (lengthOver) { setShowLengthWarn(true); return }
-    setShowLengthWarn(false)
-    onSavingChange(true)
-    setTimeout(() => {
+  // 自动保存：失焦时保存
+  const handleBlur = () => {
+    if (editText !== seg.text) {
       onEditSave()
-      onSavingChange(false)
-    }, 600)
+    }
   }
 
   const displayText = seg.text.slice(0, revealedChars)
@@ -1026,42 +1132,27 @@ function SegmentItem({ seg, isEditing, isActive, editText, onEditStart, onEditCh
           </div>
           {segmentLengthExceeded && (
             <div className="hero-ed-seg-length-warn" style={{ marginTop: '6px', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', lineHeight: 1.45, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.35)', color: 'rgba(251,191,36,0.95)' }}>
-              该片段字数超出 {maxSegmentChars}，请分段或精简。
+              该片段与原片段文本长度差距过大，请调整。
             </div>
           )}
         </>
       ) : (
         <div>
-          <textarea ref={textareaRef} value={editText} onChange={e => onEditChange(e.target.value)} rows={4}
+          <textarea
+            ref={textareaRef}
+            value={editText}
+            onChange={e => onEditChange(e.target.value)}
+            onBlur={handleBlur}
+            rows={4}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Escape') {
                 e.preventDefault()
-                if (editText !== seg.text && !isSaving) handleSave()
+                onEditCancel()
               }
-              if (e.key === 'Escape') onEditCancel()
             }}
             className="hero-ed-text-field"
             style={{ width: '100%', padding: '10px 12px', fontSize: '14px', lineHeight: 1.55, background: 'var(--bg-input)', border: '1px solid var(--border-input)', borderRadius: '10px', color: 'var(--text-primary)', resize: 'none', outline: 'none', boxSizing: 'border-box', minHeight: '4.5em' }}
           />
-          {showLengthWarn && (
-            <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.45, padding: '7px 10px', borderRadius: '8px', background: 'rgba(255,76,76,0.1)', border: '1px solid rgba(255,76,76,0.35)', color: 'rgba(255,130,130,0.95)' }}>
-              文本长度变化超出限制（±5%），请返回修改后再保存
-            </p>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
-            <div style={{ flex: 1 }} />
-            <button
-              type="button"
-              disabled={editText === seg.text || isSaving}
-              onClick={handleSave}
-              className="hero-ed-text-btn"
-              style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'rgba(24,144,255,0.2)', border: '1px solid rgba(24,144,255,0.5)', color: '#7fd6ff', fontSize: '12px', cursor: editText === seg.text || isSaving ? 'not-allowed' : 'pointer', opacity: editText === seg.text ? 0.45 : 1, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-            >
-              {isSaving && <span style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(127,214,255,0.35)', borderTopColor: '#7fd6ff', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />}
-              {isSaving ? '保存中' : '保存'}
-            </button>
-            <button type="button" onClick={onEditCancel} className="hero-ed-text-btn" style={{ height: '28px', padding: '0 14px', borderRadius: '999px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-secondary2)', fontSize: '12px', cursor: 'pointer' }}>取消</button>
-          </div>
         </div>
       )}
     </div>

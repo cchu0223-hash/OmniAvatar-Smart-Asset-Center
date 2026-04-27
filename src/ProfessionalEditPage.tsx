@@ -4,11 +4,10 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTour } from './useTour'
 import { getMaterials, addMaterial, deleteMaterial, subscribe, type SharedSmartMaterial } from './smartMaterialsStore'
-import { isLipsyncEditOverThreshold, lipsyncEditDeviationRatio, LIPSYNC_EDIT_DEVIATION_THRESHOLD } from './lipsyncEditThreshold'
 import { lipsyncTargetLanguageList as LIPSYNC_TARGET_LANGUAGES } from './lipsyncLanguages'
 
 type SidebarTool = '我的素材' | '虚拟人' | '图片' | '配音' | '音乐' | '文本' | '转场' | '模板' | '贴纸' | '素材优化' | 'AI对口型'
-type LipSyncPanelStage = 'idle' | 'uploading' | 'parsing' | 'editing' | 'generating' | 'done'
+type LipSyncPanelStage = 'idle' | 'lang-select' | 'uploading' | 'parsing' | 'editing' | 'generating' | 'done'
 
 const LS_AI_LIPSYNC_KEY = 'iw-pro-editor-ai-lipsync'
 const LS_AI_LIPSYNC_CLIP_ID = 'clip01'
@@ -256,6 +255,7 @@ function ProfessionalEditPage() {
   const [lipSyncSegments, setLipSyncSegments] = useState<AsrSegment[]>(LIP_SYNC_SEGMENT_TRANSLATIONS[defaultLipLang])
   const [segHistory, setSegHistory] = useState<AsrSegment[][]>([LIP_SYNC_SEGMENT_TRANSLATIONS[defaultLipLang]])
   const [segHistIdx, setSegHistIdx] = useState(0)
+  const [lipSyncSourceLang, setLipSyncSourceLang] = useState<'中文' | '英文'>('中文')
   const [lipSyncTranslating, setLipSyncTranslating] = useState(false)
   const [showLipSyncLangDropdown, setShowLipSyncLangDropdown] = useState(false)
   const lipSyncLangDropdownRef = useRef<HTMLDivElement>(null)
@@ -561,7 +561,7 @@ function ProfessionalEditPage() {
     setContextMenu(null)
     setHasLipSyncPanel(true)
     setActiveTool('AI对口型')
-    applyAiLipSyncEntry()
+    setLipSyncPanelStage('lang-select')
   }
 
   const handleReplaceTrack = () => {
@@ -577,6 +577,10 @@ function ProfessionalEditPage() {
   const handleReEdit = () => {
     setLipSyncPanelStage('editing')
   }
+
+  const handleConfirmLipSyncLang = useCallback(() => {
+    applyAiLipSyncEntry()
+  }, [applyAiLipSyncEntry])
 
   const cancelLipSyncUpload = useCallback(() => {
     setLipSyncPanelStage('idle')
@@ -1367,6 +1371,9 @@ function ProfessionalEditPage() {
                   onReplaceTrack={handleReplaceTrack}
                   onReEdit={handleReEdit}
                   onClose={() => { setActiveTool('我的素材') }}
+                  sourceLang={lipSyncSourceLang}
+                  onSourceLangChange={setLipSyncSourceLang}
+                  onConfirmLang={handleConfirmLipSyncLang}
                 />
               ) : activeTool === '素材优化' && selectedTrack ? (
                 <MaterialOptimizePanel />
@@ -1815,7 +1822,6 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(seg.text)
-  const [showLengthWarn, setShowLengthWarn] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -1830,31 +1836,20 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
     if (editing) textareaRef.current?.focus()
   }, [editing])
 
-  const over = isLipsyncEditOverThreshold(seg.text, draft)
-  const noChange = draft === seg.text
-  const saveDisabled = noChange || over
-
   const startEdit = () => {
     if (translating) return
     setDraft(seg.text)
     setEditing(true)
   }
 
-  const save = () => {
-    if (saveDisabled) return
-    const lengthOver = seg.text.length > 0
-      ? Math.abs(draft.length - seg.text.length) / seg.text.length > 0.05
-      : false
-    if (lengthOver) { setShowLengthWarn(true); return }
-    setShowLengthWarn(false)
-    onSegmentChange(seg.id, draft)
+  const handleBlur = () => {
+    if (draft !== seg.text) {
+      onSegmentChange(seg.id, draft)
+    }
     setEditing(false)
   }
 
-  const cancel = () => {
-    setDraft(seg.text)
-    setEditing(false)
-  }
+  const segLengthExceeded = !editing && seg.text.length > 200
 
   return (
     <div className="rounded-xl p-2.5 flex flex-col gap-1.5 lipsync-pro-seg-card" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -1865,57 +1860,38 @@ function LipSegmentEditor({ seg, translating, onSegmentChange }: {
         <span className="text-[10px]" style={{ color: 'rgba(203,213,225,0.85)' }}>{seg.speaker}</span>
       </div>
       {!editing ? (
-        <button
-          type="button"
-          onClick={startEdit}
-          disabled={translating}
-          className="w-full rounded-lg text-xs p-2 text-left leading-relaxed transition-colors disabled:opacity-50"
-          style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', background: 'transparent', cursor: translating ? 'not-allowed' : 'pointer' }}
-        >
-          {seg.text}
-        </button>
-      ) : (
         <>
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
+          <button
+            type="button"
+            onClick={startEdit}
             disabled={translating}
-            rows={3}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!saveDisabled) save() }
-              if (e.key === 'Escape') cancel()
-            }}
-            className="w-full rounded-lg text-xs p-2 resize-none outline-none leading-relaxed bg-transparent"
-            style={{ border: '1px solid rgba(0,102,255,0.45)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', opacity: translating ? 0.5 : 1 }}
-          />
-          {over && (
+            className="w-full rounded-lg text-xs p-2 text-left leading-relaxed transition-colors disabled:opacity-50"
+            style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', background: 'transparent', cursor: translating ? 'not-allowed' : 'text' }}
+            onMouseEnter={e => { if (!translating) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
+            {seg.text}
+          </button>
+          {segLengthExceeded && (
             <p className="text-[10px] leading-relaxed px-0.5" style={{ color: 'rgba(251,191,36,0.95)' }}>
-              修改幅度已超过 {Math.round(LIPSYNC_EDIT_DEVIATION_THRESHOLD * 100)}%（当前约 {Math.round(lipsyncEditDeviationRatio(seg.text, draft) * 100)}%），可能影响口型效果。<b>无法保存</b>，请精简改写或分段处理。
+              该片段与原片段文本长度差距过大，请调整。
             </p>
           )}
-          {!over && showLengthWarn && (
-            <p className="text-[10px] leading-relaxed px-0.5" style={{ color: 'rgba(255,130,130,0.95)' }}>
-              文本长度变化超出限制（±5%），请返回修改后再保存
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={save}
-              disabled={saveDisabled || translating}
-              className="px-3 py-1 rounded-lg text-[10px] font-semibold transition-opacity disabled:opacity-45 disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg,#7000ff,#0066FF)', color: '#fff', border: 'none' }}
-            >保存</button>
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={translating}
-              className="px-3 py-1 rounded-lg text-[10px] font-medium border transition-colors"
-              style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(203,213,225,0.85)', background: 'transparent' }}
-            >取消</button>
-          </div>
         </>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={handleBlur}
+          disabled={translating}
+          rows={3}
+          onKeyDown={e => {
+            if (e.key === 'Escape') { e.preventDefault(); setDraft(seg.text); setEditing(false) }
+          }}
+          className="w-full rounded-lg text-xs p-2 resize-none outline-none leading-relaxed bg-transparent"
+          style={{ border: '1px solid rgba(0,102,255,0.45)', color: 'rgba(203,213,225,0.9)', minHeight: '52px', opacity: translating ? 0.5 : 1 }}
+        />
       )}
     </div>
   )
@@ -2032,6 +2008,7 @@ function LipSyncPanel({
   onLangChange, onToggleLangDropdown, onSegmentChange,
   onUndo, onRedo, canUndo, canRedo,
   onStart, onCancelUpload, onCancelParse, onBackgroundParse, onReplaceTrack, onReEdit, onClose,
+  sourceLang, onSourceLangChange, onConfirmLang,
 }: {
   stage: LipSyncPanelStage
   uploadProgress: number
@@ -2055,6 +2032,9 @@ function LipSyncPanel({
   onReplaceTrack: () => void
   onReEdit: () => void
   onClose: () => void
+  sourceLang: '中文' | '英文'
+  onSourceLangChange: (l: '中文' | '英文') => void
+  onConfirmLang: () => void
 }) {
   const circumference = 2 * Math.PI * 28 // r=28
 
@@ -2076,6 +2056,39 @@ function LipSyncPanel({
 
       {stage === 'idle' && (
         <div className="flex-1 flex items-center justify-center px-6 text-center text-xs" style={{ color: 'rgba(148,163,184,0.55)' }}>从时间轴右键菜单进入 AI对口型 以开始上传</div>
+      )}
+
+      {/* lang-select */}
+      {stage === 'lang-select' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
+          <div className="text-center space-y-1">
+            <p className="text-sm font-semibold text-white">选择视频语种</p>
+            <p className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>请选择当前视频的源语言</p>
+          </div>
+          <div className="flex gap-3">
+            {(['中文', '英文'] as const).map(l => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => onSourceLangChange(l)}
+                className="px-5 py-2 rounded-xl text-sm font-medium border transition-all"
+                style={{
+                  borderColor: sourceLang === l ? '#00f0ff' : 'rgba(255,255,255,0.15)',
+                  background: sourceLang === l ? 'rgba(0,240,255,0.1)' : 'transparent',
+                  color: sourceLang === l ? '#00f0ff' : 'rgba(203,213,225,0.8)',
+                }}
+              >{l}</button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={onConfirmLang}
+            className="px-8 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: 'linear-gradient(90deg,#0066FF,#00f2ea)', color: '#fff', border: 'none' }}
+            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
+          >确认，开始解析</button>
+        </div>
       )}
 
       {/* uploading */}
