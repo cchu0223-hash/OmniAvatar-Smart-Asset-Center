@@ -1,0 +1,3050 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>讯飞智作 · AI 对口型</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Piazzolla:ital,wght@0,400;0,500;1,400&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ══════════════════════════════════════
+       DESIGN TOKENS  (8pt spacing grid)
+    ══════════════════════════════════════ */
+    :root {
+      /* spacing */
+      --sp-1:  4px;
+      --sp-2:  8px;
+      --sp-3: 12px;
+      --sp-4: 16px;
+      --sp-5: 20px;
+      --sp-6: 24px;
+      --sp-7: 28px;
+      --sp-8: 32px;
+      --sp-10: 40px;
+      --sp-12: 48px;
+      --sp-16: 64px;
+      --sp-20: 80px;
+
+      /* color */
+      --cyan:        #1890ff;
+      --cyan-glow:   rgba(24, 144, 255, 0.18);
+      --purple:      #722ed1;
+      --purple-glow: rgba(114, 46, 209, 0.22);
+      --bg-base:     #030a1a;
+      --bg-card:     #001529;
+      --bg-card-2:   #0b1d33;
+      --border:      #112d46;
+      --border-hi:   rgba(24, 144, 255, 0.45);
+      --text-1:      #ffffff;
+      --text-2:      rgba(255,255,255,0.65);
+      --text-3:      rgba(255,255,255,0.40);
+
+      /* radius */
+      --r-sm:  8px;
+      --r-md:  12px;
+      --r-lg:  18px;
+      --r-xl:  24px;
+
+      /* easing */
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    html {
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+      /* 底色由 JS 动态设置（initTheme/toggleTheme），防止右侧条纹 */
+      background: #030a1a;
+    }
+
+    body {
+      position: relative;
+      min-height: 100vh;
+      background: #030a1a; /* 作为最底部纯色背景，供图片底部透明过渡 */
+      font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+      color: var(--text-1);
+      overflow-x: hidden;
+      z-index: 0; /* 为 ::before / 其它层建立 stacking context */
+    }
+
+    /* 全屏底层 Banner 图（在所有内容、光效和玻璃层之下） */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(to bottom, rgba(3,10,26,0) 82%, #030a1a 100%),
+        url("./hero-banner-bg.png");
+      background-repeat: no-repeat;
+      background-size: cover;
+      /* 再向上 50px，让亮区更贴近标题区域 */
+      background-position: center -160px;
+      opacity: 1;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ══════════════════════════════════════
+       LAYERED BACKGROUND SYSTEM
+       Layer 0  body gradient (darkest)
+       Layer 1  glass overlay
+       Layer 2  ambient corner glows
+       Layer 3  page content
+    ══════════════════════════════════════ */
+
+    /* Glass overlay — 极轻的磨砂层，让底图明显可见 */
+    .glass-overlay {
+      position: fixed; inset: 0;
+      background: rgba(13, 15, 20, 0.30);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Ambient corner glows ── */
+    .glow-tr,
+    .glow-bl {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2;       /* above glass, below content */
+      border-radius: 50%;
+    }
+
+    /* Top-right  — purple / indigo */
+    .glow-tr {
+      top:   -140px;
+      right: -200px;
+      width:  560px;
+      height: 480px;
+      background: radial-gradient(
+        ellipse at 88% 25%,
+        rgba(114, 46, 209, 0.35)  0%,
+        rgba(24, 144, 255, 0.16) 45%,
+        transparent             70%
+      );
+      filter: blur(55px);
+      /* 不使用 clip-path，让渐变自然淡出；
+         通过右移 -200px 并将中心点推至 88% 使光晕核心离开视口 */
+    }
+
+    /* Bottom-left — cyan / blue（已隐藏，避免左下角蓝色光晕干扰） */
+    .glow-bl {
+      display: none;
+    }
+
+    /* ── Page shell ── */
+    .page {
+      position: relative;
+      z-index: 3;
+      max-width: 1267px;
+      margin: 0 auto;
+      padding: var(--sp-5) var(--sp-8) var(--sp-20);
+    }
+
+    /* ══════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════ */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: var(--sp-20);   /* 80px — faithful to Figma 90px, on 8pt */
+    }
+
+    .logo {
+      height: 29px;
+      cursor: pointer;
+      transition: transform .2s var(--ease-out), filter .2s;
+      user-select: none;
+    }
+    .logo:hover  { filter: brightness(1.18); }
+    .logo:active { transform: scale(.91); }
+
+    .btn-login {
+      position: relative; overflow: hidden;
+      display: inline-flex; align-items: center; justify-content: center;
+      height: 36px;
+      padding: 0 var(--sp-4);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      font-family: 'PingFang SC', sans-serif;
+      font-size: 14px;
+      letter-spacing: .3px;
+      background-image: none;
+      background: unset;
+      background-clip: unset;
+      -webkit-background-clip: unset;
+      color: rgba(2, 241, 255, 1);
+      background-color: rgba(2, 241, 255, 0.08);
+      border-style: solid;
+      border-width: 1px;
+      border-color: rgba(2, 241, 255, 1);
+      white-space: nowrap;
+      transition: transform .15s var(--ease-out), box-shadow .2s;
+    }
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(24, 144, 255, 0.5);
+    }
+    .btn-login:active { transform: scale(.92); }
+
+    /* ══════════════════════════════════════
+       HERO  —  idle / editor 叠层切换（同区域过渡）
+    ══════════════════════════════════════ */
+    .hero {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+      margin-top: calc(-1 * var(--sp-5)); /* 与 header 间距略收紧 */
+      margin-bottom: var(--sp-12);
+      min-height: 461px;
+      overflow: visible;
+    }
+
+    #heroSection {
+      height: 474px;
+    }
+
+    #heroPaneIdle {
+      height: 440px;
+    }
+
+    .hero-pane {
+      grid-column: 1;
+      grid-row: 1;
+      min-width: 0;
+      position: relative;
+      transition:
+        opacity .38s var(--ease-out),
+        transform .38s var(--ease-out),
+        visibility 0s linear .38s;
+    }
+
+    .hero-pane--idle {
+      display: grid;
+      grid-template-columns: 503px 1fr;
+      column-gap: var(--sp-6);
+      align-items: start;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+      z-index: 1;
+    }
+
+    .hero-pane--editor {
+      display: none;
+      width: 100%;
+      align-self: stretch;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(14px) scale(0.985);
+      pointer-events: none;
+      z-index: 3;
+      transition:
+        opacity .38s var(--ease-out),
+        transform .38s var(--ease-out),
+        visibility 0s linear .38s;
+    }
+
+    .hero.hero--editing .hero-pane--idle {
+      display: none;
+    }
+
+    .hero.hero--editing .hero-pane--editor {
+      display: block;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+      transition:
+        opacity .4s var(--ease-out) .06s,
+        transform .4s var(--ease-out) .06s,
+        visibility 0s;
+    }
+
+    /* 弹窗（编辑器）打开时，让 hero 区域撑开，挤压下方内容下移 */
+    #heroSection.hero--editing {
+      height: auto;
+      min-height: 474px;
+    }
+
+    /* ── 内嵌编辑器（Figma 301:88 布局，非 iframe） ── */
+    .hero-editor {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      border: 1px solid #2f3d52;
+      border-radius: 16px;
+      background: var(--bg-card);
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    .hero-editor-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 46px;
+      padding: 0 var(--sp-4);
+      border-bottom: 1px solid #2f3d52;
+      gap: var(--sp-3);
+    }
+
+    .hero-editor-filename {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-1);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .hero-editor-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--sp-3);
+      justify-content: flex-end;
+    }
+
+    .hero-ed-credit-estimate {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+      background: linear-gradient(90deg, var(--cyan), #41bcc3 50%, #6b8cff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+      margin-right: var(--sp-1);
+    }
+    .hero-ed-credit-estimate b {
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+      .hero-ed-credit-estimate {
+        color: var(--cyan);
+        -webkit-text-fill-color: unset;
+        background: none;
+      }
+    }
+
+    .hero-ed-btn {
+      height: 35px;
+      padding: 0 var(--sp-4);
+      border-radius: 10px;
+      border: 1px solid #2f3d52;
+      background: #141b26;
+      color: var(--text-1);
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color .2s, transform .12s var(--ease-out);
+    }
+    .hero-ed-btn:hover { border-color: rgba(255, 255, 255, 0.22); }
+    .hero-ed-btn:active { transform: scale(0.96); }
+
+    .hero-ed-btn--primary {
+      border: none;
+      background: linear-gradient(
+        102.58deg,
+        rgb(42, 19, 255) 9.75%,
+        rgb(83, 64, 255) 40.42%,
+        rgb(11, 255, 239) 117.18%
+      );
+    }
+
+    .hero-editor-body {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(260px, 1fr);
+      min-height: min(506px, 58vh);
+      max-height: min(506px, 62vh);
+    }
+
+    @media (max-width: 900px) {
+      .hero-editor-body {
+        grid-template-columns: 1fr;
+        max-height: none;
+      }
+    }
+
+    .hero-ed-left {
+      background: #141b26;
+      padding: var(--sp-4) var(--sp-3) var(--sp-3);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .hero-ed-video {
+      flex: 1 1 0;
+      min-height: 168px;
+      max-height: 70%;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .hero-ed-video img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .hero-ed-timeline-meta {
+      margin-top: var(--sp-6);
+      align-self: stretch;
+      width: 100%;
+      min-width: 0;
+      color: #c6ddff;
+      font-size: 14px;
+    }
+    .hero-ed-transport-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      width: 100%;
+      min-width: 0;
+      column-gap: var(--sp-2);
+      padding: var(--sp-2) 0;
+    }
+    .hero-ed-time {
+      white-space: nowrap;
+      justify-self: start;
+    }
+    .hero-ed-play {
+      cursor: default;
+      line-height: 1;
+      justify-self: center;
+    }
+    .hero-ed-fullscreen {
+      opacity: 0.7;
+      line-height: 1;
+      justify-self: end;
+    }
+    .hero-ed-timeline-meta span.muted { font-size: 12px; color: #4b6185; }
+
+    .hero-ed-strip {
+      margin-top: var(--sp-7);
+      height: 32px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #0f1520;
+    }
+    .hero-ed-strip img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero-ed-right {
+      padding: var(--sp-4);
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .hero-ed-right-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--sp-4);
+      margin-bottom: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    .hero-ed-right-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    .hero-ed-lang-select {
+      appearance: none;
+      -webkit-appearance: none;
+      min-width: 160px;
+      height: 34px;
+      padding: 0 32px 0 12px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--text-1);
+      background: #141b26
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300f2ea' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")
+        no-repeat right 10px center;
+      border: 1px solid #2f3d52;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .hero-ed-lang-select:hover,
+    .hero-ed-lang-select:focus {
+      outline: none;
+      border-color: rgba(24, 144, 255, 0.45);
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.12);
+    }
+
+    .hero-ed-seg {
+      margin-bottom: var(--sp-3);
+    }
+    .hero-ed-seg-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--sp-2);
+      margin-bottom: 6px;
+    }
+    .hero-ed-spk {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.35);
+    }
+    .hero-ed-avatar {
+      width: 27px;
+      height: 27px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .hero-ed-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .hero-ed-range-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .hero-ed-range {
+      font-size: 12px;
+      color: #959595;
+      white-space: nowrap;
+    }
+    .hero-ed-seg.is-active .hero-ed-range {
+      color: #fff;
+    }
+    .hero-ed-range-play {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      margin: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      color: #959595;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition:
+        background 0.18s var(--ease-out),
+        color 0.18s var(--ease-out),
+        transform 0.12s var(--ease-out);
+    }
+    .hero-ed-seg.is-active .hero-ed-range-play {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+    }
+    .hero-ed-range-play:hover {
+      background: rgba(24, 144, 255, 0.22);
+      color: var(--cyan);
+    }
+    .hero-ed-seg.is-active .hero-ed-range-play:hover {
+      color: var(--cyan);
+    }
+    .hero-ed-range-play:active {
+      transform: scale(0.9);
+    }
+    .hero-ed-range-play svg {
+      width: 7px;
+      height: 9px;
+      margin-left: 1px;
+    }
+
+    .hero-ed-text-block {
+      margin-top: 2px;
+    }
+    .hero-ed-text-display {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #ebebeb;
+      cursor: text;
+      border-radius: 8px;
+      padding: 6px 8px;
+      margin: -6px -8px;
+      outline: none;
+      transition: background 0.18s var(--ease-out);
+    }
+    .hero-ed-text-display:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .hero-ed-text-display:focus-visible {
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.25);
+    }
+    .hero-ed-text-field {
+      display: none;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 15px;
+      line-height: 1.55;
+      font-family: inherit;
+      color: #ebebeb;
+      background: #1a2330;
+      border: 1px solid rgba(24, 144, 255, 0.35);
+      border-radius: 10px;
+      resize: vertical;
+      min-height: 4.5em;
+      outline: none;
+    }
+    .hero-ed-text-field:focus {
+      border-color: rgba(24, 144, 255, 0.55);
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.12);
+    }
+    .hero-ed-text-toolbar {
+      display: none;
+      flex-direction: row;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-top: var(--sp-2);
+    }
+    .hero-ed-text-block.is-editing .hero-ed-text-display {
+      display: none;
+    }
+    .hero-ed-text-block.is-editing .hero-ed-text-field {
+      display: block;
+    }
+    .hero-ed-text-block.is-editing .hero-ed-text-toolbar {
+      display: flex;
+    }
+    .hero-ed-text-btn {
+      height: 30px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid #2f3d52;
+      background: #141b26;
+      color: var(--text-1);
+      transition: border-color 0.18s, background 0.18s;
+    }
+    .hero-ed-text-btn:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .hero-ed-text-save {
+      border: none;
+      background: linear-gradient(
+        102.58deg,
+        rgb(42, 19, 255) 9.75%,
+        rgb(83, 64, 255) 40.42%,
+        rgb(11, 255, 239) 117.18%
+      );
+    }
+    .hero-ed-text-save:hover {
+      filter: brightness(1.06);
+    }
+    .hero-ed-seg.is-active {
+      background: #374559;
+      border-radius: 16px;
+      padding: 10px 12px;
+      margin-left: -4px;
+      margin-right: -4px;
+    }
+    .hero-ed-seg.is-active .hero-ed-text-display,
+    .hero-ed-seg.is-active .hero-ed-text-field {
+      color: #c6ddff;
+    }
+    .hero-ed-hl {
+      background: #85bcff;
+      color: #0b0f15;
+      border-radius: 2px;
+      padding: 0 2px;
+    }
+
+    /* ── Left column（首屏 idle） ── */
+    .hero-left {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-6);
+      align-items: flex-start;
+      width: 503px;
+      flex-shrink: 0;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    .title-star-wrap {
+      width: 62px; height: 62px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: -20px;
+      margin-bottom: -20px;
+    }
+    .title-star-wrap img {
+      width: 50px; height: 50px;
+      pointer-events: none;
+    }
+
+    .title-heading {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-2);
+      max-width: 441px;
+      min-height: auto;
+    }
+
+    .title-text {
+      font-family: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: clamp(20px, 2.4vw, 36px);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.35px;
+      margin: 0;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: baseline;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+    .title-text__seg {
+      display: inline-block;
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+    .title-text__seg--mono {
+      background-image: linear-gradient(90deg, #ffffff 0%, #cbd5e0 100%);
+    }
+    .title-text__seg--accent {
+      background-image: linear-gradient(90deg, #00f2ff 0%, #3b82f6 52%, #8b5cf6 100%);
+    }
+    .title-text__cursor {
+      display: inline-block;
+      width: 3px;
+      height: 0.92em;
+      margin-left: 2px;
+      align-self: center;
+      border-radius: 1px;
+      background: linear-gradient(180deg, #00f2ff 0%, #3b82f6 45%, #8b5cf6 100%);
+      vertical-align: -0.06em;
+      animation: titleCursorBlink 1s step-end infinite;
+    }
+    @keyframes titleCursorBlink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+      .title-text__seg--mono {
+        color: #e2e8f0;
+        -webkit-text-fill-color: unset;
+        background: none;
+      }
+      .title-text__seg--accent {
+        color: var(--cyan);
+        -webkit-text-fill-color: unset;
+        background: none;
+      }
+    }
+
+    .title-sub {
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1.5;
+      letter-spacing: 0.2px;
+      color: rgba(112, 207, 255, 0.65);
+      margin: 0;
+      max-width: 36em;
+      width: 411px;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin-left: -46px;
+      margin-right: -46px;
+    }
+
+    .upload-card {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background: rgba(24, 34, 52, 0.42);
+      backdrop-filter: blur(22px) saturate(1.2);
+      -webkit-backdrop-filter: blur(22px) saturate(1.2);
+      border: 1px solid rgba(120, 190, 255, 0.22);
+      border-radius: var(--r-lg);
+      padding: var(--sp-5) var(--sp-4) var(--sp-4);
+      width: 602px;
+      height: 258px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      box-shadow:
+        0 0 0 1px rgba(24, 144, 255, 0.05) inset,
+        0 10px 40px rgba(0, 50, 120, 0.18),
+        0 1px 0 rgba(255, 255, 255, 0.06) inset;
+      transition:
+        border-color .32s var(--ease-out),
+        box-shadow .32s var(--ease-out),
+        background .32s var(--ease-out),
+        transform .15s var(--ease-out);
+    }
+    .upload-card::after {
+      content: '';
+      position: absolute;
+      inset: -48% -38% -32% -38%;
+      background:
+        radial-gradient(
+          ellipse 78% 58% at 50% 24%,
+          rgba(100, 200, 255, 0.22) 0%,
+          rgba(0, 115, 220, 0.08) 38%,
+          transparent 68%
+        ),
+        radial-gradient(
+          ellipse 110% 52% at 50% 108%,
+          rgba(80, 190, 255, 0.14) 0%,
+          transparent 55%
+        );
+      opacity: 0.75;
+      pointer-events: none;
+      z-index: 0;
+      transition: opacity .35s var(--ease-out), filter .35s var(--ease-out);
+    }
+    .upload-card > * {
+      position: relative;
+      z-index: 1;
+    }
+    .upload-card:hover {
+      border-color: rgba(24, 144, 255, 0.42);
+      background: rgba(28, 42, 64, 0.48);
+      box-shadow:
+        0 0 0 1px rgba(24, 144, 255, 0.12) inset,
+        0 0 56px rgba(24, 144, 255, 0.22),
+        0 0 100px rgba(114, 46, 209, 0.14),
+        0 16px 48px rgba(0, 70, 160, 0.22),
+        -12px 20px 44px rgba(24, 144, 255, 0.1),
+        12px 20px 44px rgba(114, 46, 209, 0.08);
+    }
+    .upload-card:hover::after {
+      opacity: 1;
+      filter: saturate(1.25);
+      background:
+        radial-gradient(
+          ellipse 84% 62% at 50% 20%,
+          rgba(24, 144, 255, 0.26) 0%,
+          rgba(0, 115, 255, 0.14) 42%,
+          rgba(114, 46, 209, 0.07) 62%,
+          transparent 72%
+        ),
+        radial-gradient(
+          ellipse 130% 48% at 50% 112%,
+          rgba(24, 144, 255, 0.2) 0%,
+          rgba(0, 115, 255, 0.1) 35%,
+          transparent 58%
+        ),
+        radial-gradient(
+          ellipse 45% 28% at 12% 92%,
+          rgba(24, 144, 255, 0.12) 0%,
+          transparent 70%
+        );
+    }
+    .upload-card:active { transform: scale(.985); }
+    .upload-card.drag-over {
+      border-color: rgba(24, 144, 255, 0.65);
+      background: rgba(20, 48, 58, 0.52);
+      box-shadow:
+        0 0 0 1px rgba(24, 144, 255, 0.2) inset,
+        0 0 72px rgba(24, 144, 255, 0.28),
+        0 0 120px rgba(114, 46, 209, 0.18);
+    }
+    .upload-card.drag-over::after {
+      opacity: 1;
+      background:
+        radial-gradient(
+          ellipse 85% 62% at 50% 20%,
+          rgba(24, 144, 255, 0.35) 0%,
+          rgba(0, 115, 255, 0.2) 45%,
+          transparent 70%
+        ),
+        radial-gradient(
+          ellipse 130% 48% at 50% 112%,
+          rgba(24, 144, 255, 0.18) 0%,
+          transparent 58%
+        ),
+        radial-gradient(
+          ellipse 45% 28% at 12% 92%,
+          rgba(24, 144, 255, 0.14) 0%,
+          transparent 70%
+        );
+    }
+
+    .upload-card::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 5%, rgba(255,255,255,.12) 50%, transparent 95%);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .upload-card-title {
+      font-family: 'Piazzolla', 'PingFang SC', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.52);
+      margin: var(--sp-4) 0 0;
+      padding: 0 var(--sp-2);
+      text-align: center;
+      align-self: stretch;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+    }
+
+    .upload-actions {
+      margin-top: 9px;
+      margin-bottom: 33px;
+      height: 41px;
+      padding: 0 var(--sp-2);
+      display: flex;
+      gap: var(--sp-3);
+      align-items: center;
+      justify-content: center;
+      align-self: stretch;
+    }
+
+    .upload-action-btn {
+      position: relative;
+      overflow: hidden;
+      height: 34px;
+      padding: 0 var(--sp-5);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.88);
+      cursor: pointer;
+      font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition:
+        transform .15s var(--ease-out),
+        box-shadow .2s var(--ease-out),
+        background .2s var(--ease-out),
+        border-color .2s var(--ease-out),
+        color .2s var(--ease-out);
+    }
+
+    .upload-action-btn:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 229, 255, 0.70);
+      background: rgba(0, 229, 255, 0.16);
+      box-shadow:
+        0 0 0 1px rgba(0, 229, 255, 0.18) inset,
+        0 10px 26px rgba(0, 102, 255, 0.28),
+        0 0 22px rgba(0, 229, 255, 0.22);
+      color: #ffffff;
+    }
+
+    .upload-action-btn:active {
+      transform: translateY(0) scale(.97);
+    }
+
+    .upload-action-btn--primary {
+      border: none;
+      background: linear-gradient(226.88deg, rgba(106, 14, 255, 1) 2%, rgba(0, 102, 255, 1) 92%);
+      color: #ffffff;
+      box-shadow: 0 10px 26px rgba(0, 102, 255, 0.18);
+    }
+
+    .upload-action-btn--primary:hover {
+      background: #00E5FF;
+      color: #0a0c12;
+      box-shadow:
+        0 14px 34px rgba(0, 102, 255, 0.36),
+        0 0 0 1px rgba(0, 229, 255, 0.22) inset,
+        0 0 30px rgba(0, 229, 255, 0.28);
+      filter: none;
+    }
+
+    .upload-inner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-7);
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 0;
+    }
+    .upload-icon-area {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-1);
+      align-items: center;
+      width: 174px;
+    }
+    .upload-icon { width: 33px; height: 33px; pointer-events: none; }
+
+    .upload-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(3, 10, 26, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s var(--ease-out);
+      z-index: 3;
+    }
+    .upload-loading.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .upload-loading-spinner {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      border-top-color: #00e5ff;
+      animation: uploadSpin 0.9s linear infinite;
+      margin-bottom: var(--sp-3);
+    }
+    .upload-loading-text {
+      font-size: 13px;
+      color: rgba(226, 232, 240, 0.92);
+      letter-spacing: .2px;
+    }
+    .upload-loading-text span + span {
+      margin-left: 6px;
+      color: #60a5fa;
+      font-variant-numeric: tabular-nums;
+    }
+    @keyframes uploadSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    .upload-main-text {
+      font-family: 'Piazzolla', sans-serif;
+      font-size: 15px; font-weight: 500;
+      color: var(--text-1);
+      text-align: center;
+      white-space: nowrap;
+      margin-top: var(--sp-1);
+    }
+    .upload-formats {
+      width: 244px;
+      height: 21px;
+      font-size: 12px;
+      color: var(--text-3);
+      text-align: center;
+      letter-spacing: .2px;
+    }
+
+    .hero-right {
+      position: relative;
+      overflow: hidden;
+      width: min(536px, 100%);
+      max-width: 100%;
+      aspect-ratio: 658 / 461;
+      height: auto;
+      border-radius: var(--r-lg);
+      flex-shrink: 0;
+      cursor: pointer;
+      justify-self: end;
+      opacity: 1;
+      transition:
+        box-shadow .28s var(--ease-out),
+        transform .22s var(--ease-out);
+    }
+    .hero-right:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(0,242,234,.12);
+    }
+    .hero-right .video-img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      border-radius: var(--r-lg);
+      pointer-events: none;
+    }
+    .hero-right .video-grad {
+      position: absolute;
+      inset: 0;
+      border-radius: var(--r-lg);
+      background: linear-gradient(
+        180deg,
+        transparent 48%,
+        rgba(0, 60, 120, 0.12) 68%,
+        rgba(0, 0, 0, 0.58) 100%
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .hero-right-title {
+      position: absolute;
+      top: var(--sp-4);
+      left: var(--sp-4);
+      right: 3.25rem;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: 0.03em;
+      color: #fff;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.9),
+        0 0 18px rgba(0, 0, 0, 0.65);
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .ctrl-top {
+      position: absolute;
+      top: var(--sp-4); right: var(--sp-5);
+      display: flex; gap: var(--sp-2);
+      z-index: 5;
+    }
+    .icon-btn {
+      width: 26px; height: 26px;
+      cursor: pointer;
+      transition: transform .15s var(--ease-out), filter .15s;
+    }
+    .icon-btn:hover  { filter: brightness(1.5); }
+    .icon-btn:active { transform: scale(.8); }
+
+    .ctrl-bottom {
+      position: absolute;
+      bottom: var(--sp-4);
+      left: var(--sp-7);
+      right: var(--sp-5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 5;
+    }
+    .play-btn {
+      width: 31px; height: 31px;
+      cursor: pointer;
+      transition: transform .15s var(--ease-out);
+    }
+    .play-btn:hover  { transform: scale(1.2); }
+    .play-btn:active { transform: scale(.84); }
+
+    .btn-ztk {
+      position: relative; overflow: hidden;
+      height: 40px;
+      padding: 0 22px 0 46px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      cursor: pointer;
+      font-family: 'Piazzolla', 'PingFang SC', sans-serif;
+      font-size: 15px; font-weight: 500;
+      color: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.10);
+      white-space: nowrap;
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+        0 10px 22px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition:
+        transform .15s var(--ease-out),
+        box-shadow .2s var(--ease-out),
+        background .2s var(--ease-out),
+        border-color .2s var(--ease-out),
+        color .2s var(--ease-out);
+    }
+    .btn-ztk::before {
+      content: '';
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 18px 18px;
+      opacity: 0.92;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 17.27l-5.18 2.73 0.99-5.81-4.2-4.09 5.82-0.85L12 4l2.57 5.25 5.82 0.85-4.2 4.09 0.99 5.81L12 17.27Z' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    .btn-ztk:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 229, 255, 0.60);
+      background: rgba(0, 229, 255, 0.10);
+      color: rgba(0, 229, 255, 0.92);
+      box-shadow:
+        0 0 0 1px rgba(0, 229, 255, 0.20) inset,
+        0 12px 28px rgba(0, 0, 0, 0.26);
+    }
+    .btn-ztk:hover::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 17.27l-5.18 2.73 0.99-5.81-4.2-4.09 5.82-0.85L12 4l2.57 5.25 5.82 0.85-4.2 4.09 0.99 5.81L12 17.27Z' stroke='%2300E5FF' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    .btn-ztk:active { transform: scale(.90); }
+
+    /* ══════════════════════════════════════
+       TABS
+    ══════════════════════════════════════ */
+    .tabs-row {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: var(--sp-5);
+      width: 100%;
+    }
+    .tab-pill {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: var(--sp-6);
+      background: none;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      min-height: 0;
+    }
+    .tab-btn {
+      position: relative;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'PingFang SC', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: .2px;
+      color: var(--text-2);
+      padding: 0 0 10px;
+      transition: color .22s, transform .1s var(--ease-out);
+    }
+    .tab-btn.active {
+      color: var(--text-1);
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;          /* 选中条宽度与文字（按钮内容）一致 */
+      height: 3px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--cyan), #0066ff);
+    }
+
+    .tab-btn:active { transform: scale(.92); }
+
+    .tab-pill.mine-tab-active #tab-more {
+      color: rgba(255, 255, 255, 0.55);
+    }
+    .tab-pill.mine-tab-active #tab-mine {
+      color: #fff;
+    }
+
+    /* ══════════════════════════════════════
+       「我的合成」项目卡（Figma 307:238 最新版）
+    ══════════════════════════════════════ */
+    .tab-panel { width: 100%; }
+    .tab-panel[hidden] { display: none !important; }
+
+    .mine-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .mine-card {
+      display: flex;
+      align-items: stretch;
+      gap: 18px;
+      min-height: 116px;
+      background: #171d26;
+      border-radius: 20px;
+      padding: 14px 22px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: border-color .2s, box-shadow .2s, background .2s;
+    }
+    .mine-card:hover {
+      border-color: rgba(127, 214, 255, 0.35);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      background: #1c2531;
+    }
+
+    .mine-card--draft {
+      border-style: dashed;
+      border-color: rgba(255, 255, 255, 0.35);
+      background: rgba(23, 29, 38, 0.7);
+    }
+
+    .mine-thumb {
+      width: 212px;
+      min-width: 212px;
+      height: 120px;
+      border-radius: 10px;
+      overflow: hidden;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .mine-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .mine-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .mine-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: #ffffff;
+      line-height: 1.4;
+    }
+
+    .mine-subtitle {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .mine-status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .mine-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      height: 24px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.82);
+      background: rgba(0, 0, 0, 0.15);
+      white-space: nowrap;
+    }
+    .mine-chip--primary {
+      border-color: rgba(127, 214, 255, 0.6);
+      background: rgba(24, 144, 255, 0.16);
+      color: #7fd6ff;
+    }
+    .mine-chip--danger {
+      border-color: rgba(255, 99, 132, 0.8);
+      background: rgba(255, 76, 76, 0.14);
+      color: #ff8080;
+    }
+    .mine-chip--success {
+      border-color: rgba(72, 199, 142, 0.8);
+      background: rgba(72, 199, 142, 0.14);
+      color: #6be6a5;
+    }
+
+    .mine-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 6px;
+    }
+
+    .mine-btn {
+      min-width: 72px;
+      height: 32px;
+      padding: 0 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(24, 144, 255, 0.3);
+      background: rgba(24, 144, 255, 0.12);
+      color: #1890ff;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: none;
+      transition:
+        transform .12s var(--ease-out),
+        background .18s,
+        border-color .18s,
+        filter .18s;
+    }
+    .mine-btn:hover {
+      transform: translateY(-1px);
+      background: rgba(24, 144, 255, 0.18);
+      border-color: rgba(24, 144, 255, 0.55);
+      filter: brightness(1.05);
+    }
+    .mine-btn:active {
+      transform: scale(0.96);
+    }
+
+    .mine-btn--primary { }
+
+    /* 下载：胶囊按钮，保留 ⇩ 图标 */
+    .mine-btn--download {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .mine-btn--download::before {
+      content: "⇩";
+      font-size: 13px;
+      line-height: 1;
+    }
+    .mine-btn--download:active {
+      transform: none;
+    }
+
+    .mine-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: space-between;
+      min-width: 72px;
+      padding-left: 12px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .mine-meta-time {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .mine-delete-btn {
+      background: rgba(255, 77, 79, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 77, 79, 0.35);
+      padding: 0 14px;
+      height: 32px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #ff4d4f;
+      cursor: pointer;
+      transition: background .18s, border-color .18s, transform .12s var(--ease-out);
+    }
+    .mine-delete-btn:hover {
+      background: rgba(255, 77, 79, 0.18);
+      border-color: rgba(255, 77, 79, 0.6);
+    }
+    .mine-delete-btn:active { transform: scale(0.96); }
+
+    /* ══════════════════════════════════════
+       VIDEO GRID  — full-width, 3-col CSS grid
+       aligns flush with the hero section edges
+    ══════════════════════════════════════ */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--sp-5) var(--sp-3);  /* 20px row · 12px col */
+      width: 100%;                    /* fills the same content box as .hero */
+    }
+
+    .v-card {
+      position: relative; overflow: hidden;
+      width: 100%;
+      aspect-ratio: 352 / 206;        /* preserves original card proportions */
+      height: auto;
+      border-radius: var(--r-lg);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition:
+        transform .24s var(--ease-out),
+        box-shadow .24s var(--ease-out),
+        border-color .24s;
+    }
+    .v-card:hover {
+      transform: translateY(-6px) scale(1.012);
+      box-shadow: 0 20px 50px rgba(0,0,0,.6);
+      border-color: rgba(0,242,234,.14);
+    }
+    .v-card:active {
+      transform: scale(.965);
+      transition-duration: .1s;
+    }
+    .v-card img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      display: block;
+    }
+
+    .vcard-top-tags {
+      position: absolute;
+      top: var(--sp-3);
+      left: var(--sp-3);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .vcard-footer {
+      position: absolute;
+      left: var(--sp-3);
+      right: var(--sp-3);
+      bottom: var(--sp-3);
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .vcard-dub-title {
+      margin: 0;
+      width: 100%;
+      max-width: 100%;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: 0.02em;
+      text-align: left;
+      color: #ffffff;
+      text-shadow:
+        0 0 1px rgba(0, 0, 0, 0.9),
+        0 1px 3px rgba(0, 0, 0, 0.75);
+      pointer-events: none;
+    }
+
+    .vcard-overlay {
+      position: absolute; inset: 0;
+      z-index: 1;
+      font-size: 12px;
+      background:
+        linear-gradient(rgba(0,0,0,0.20), rgba(0,0,0,0.20)),
+        linear-gradient(
+        180deg,
+        rgba(0,0,0,0)   40%,
+        rgba(0,0,0,.0)  55%,
+        rgba(0,0,0,.78) 100%
+      );
+      opacity: 0.85;
+      transition: opacity .26s;
+    }
+    .v-card:hover .vcard-overlay { opacity: 1; }
+
+    .vcard-play {
+      position: absolute;
+      inset: 0 0 52px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .24s var(--ease-out);
+      z-index: 3;
+    }
+    .v-card:hover .vcard-play { opacity: 1; }
+    .vcard-play-icon {
+      width: 48px; height: 48px;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 50%;
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .15s var(--ease-out), background .15s;
+    }
+    .v-card:hover .vcard-play-icon { transform: scale(1.08); }
+    .v-card:active .vcard-play-icon { transform: scale(.88); }
+    .vcard-play-icon svg { margin-left: 3px; }
+
+    .vtag {
+      display: flex; gap: var(--sp-1);
+    }
+    .vtag span {
+      font-size: 11px;
+      padding: var(--sp-1) var(--sp-2);
+      border-radius: 20px;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+      letter-spacing: .3px;
+    }
+    .vtag-lang {
+      background: rgba(80, 16, 160, 0.5);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #ffffff;
+    }
+    .vtag-cat {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.18);
+      color: var(--text-1);
+    }
+
+    /* ── 做同款：默认隐藏，卡片 hover 时出现（叠在文案上方偏左） ── */
+    .btn-ztk-sm {
+      position: absolute;
+      left: 0;
+      bottom: 100%;
+      margin-bottom: 6px;
+      overflow: visible;
+      height: 28px;
+      padding: 0 14px 0 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      cursor: pointer;
+      font-family: 'Piazzolla', 'PingFang SC', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.10);
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition:
+        opacity .22s var(--ease-out),
+        transform .22s var(--ease-out),
+        box-shadow .15s,
+        background .15s var(--ease-out),
+        border-color .15s var(--ease-out);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+        0 8px 18px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .btn-ztk-sm::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      transform: translateY(-50%);
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 14px 14px;
+      opacity: 0.92;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 17.27l-5.18 2.73 0.99-5.81-4.2-4.09 5.82-0.85L12 4l2.57 5.25 5.82 0.85-4.2 4.09 0.99 5.81L12 17.27Z' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    .v-card:hover .btn-ztk-sm {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .v-card:hover .btn-ztk-sm:hover {
+      border-color: rgba(0, 229, 255, 0.60);
+      background: rgba(0, 229, 255, 0.10);
+      color: rgba(0, 229, 255, 0.92);
+      box-shadow:
+        0 0 0 1px rgba(0, 229, 255, 0.20) inset,
+        0 10px 22px rgba(0, 0, 0, 0.26);
+    }
+    .v-card:hover .btn-ztk-sm:hover::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 17.27l-5.18 2.73 0.99-5.81-4.2-4.09 5.82-0.85L12 4l2.57 5.25 5.82 0.85-4.2 4.09 0.99 5.81L12 17.27Z' stroke='%2300E5FF' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    .btn-ztk-sm:active { transform: translateY(0) scale(.94); }
+
+    /* ══════════════════════════════════════
+       做同款弹窗
+    ══════════════════════════════════════ */
+    .ztk-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .24s var(--ease-out);
+      z-index: 40;
+    }
+    .ztk-modal-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .ztk-modal {
+      position: relative;
+      width: 960px;
+      max-width: calc(100% - 80px);
+      border-radius: 10px;
+      background: rgba(26, 30, 45, 1);
+      box-shadow: 0 20px 60px rgba(0,0,0,.75);
+      font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+      color: rgba(229, 231, 235, 1);
+      padding: 24px 24px 20px;
+    }
+    .ztk-modal-close {
+      position: absolute;
+      right: 20px;
+      top: 18px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: none;
+      background: #e5e7eb;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+      margin-top: -57px;
+      margin-bottom: -57px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.25);
+      transition: background .15s var(--ease-out), transform .12s var(--ease-out);
+    }
+    .ztk-modal-close:hover { background: #f9fafb; }
+    .ztk-modal-close:active { transform: scale(.9); }
+    .ztk-modal-body {
+      margin-top: 6px;
+    }
+    .ztk-modal-videos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      background: rgba(22, 26, 39, 1);
+      border-radius: 6px;
+      padding: 18px 18px 20px;
+    }
+    .ztk-video-label {
+      font-size: 13px;
+      color: rgba(249,250,251,.85);
+      margin-bottom: 8px;
+    }
+    .ztk-video-frame {
+      position: relative;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #020617;
+    }
+    .ztk-video-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .ztk-video-play {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(15,23,42,.9);
+      color: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .ztk-video-play--right {
+      left: auto;
+      right: 18px;
+    }
+    .ztk-video-progress {
+      margin-top: 10px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(31,41,55,1);
+      overflow: hidden;
+    }
+    .ztk-video-progress-bar {
+      width: 45%;
+      height: 100%;
+      background: #f9fafb;
+    }
+    .ztk-modal-bottom {
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ztk-modal-title-text {
+      font-size: 15px;
+      color: #f9fafb;
+    }
+    .ztk-modal-cta {
+      min-width: 104px;
+      height: 36px;
+      padding: 0 26px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(90deg, #00e0ff 0%, #3b82f6 50%, #8b5cf6 100%);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .03em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px rgba(15,23,42,.8);
+      transition: transform .12s var(--ease-out), box-shadow .15s var(--ease-out), filter .15s var(--ease-out);
+    }
+    .ztk-modal-cta:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(15,23,42,.9);
+    }
+    .ztk-modal-cta:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 14px rgba(15,23,42,.8);
+    }
+    @media (max-width: 900px) {
+      .ztk-modal {
+        width: 100%;
+        max-width: calc(100% - 32px);
+      }
+      .ztk-modal-videos {
+        grid-template-columns: 1fr;
+      }
+      .ztk-modal-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+    }
+
+    /* ══════════════════════════════════════
+       RIPPLE
+    ══════════════════════════════════════ */
+    .ripple {
+      position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,.25);
+      transform: scale(0);
+      pointer-events: none;
+      animation: rippleAnim .6s var(--ease-out);
+    }
+    @keyframes rippleAnim { to { transform: scale(5); opacity: 0; } }
+
+    /* ══════════════════════════════════════
+       SCROLLBAR
+    ══════════════════════════════════════ */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,.12);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.22); }
+
+    /* ══════════════════════════════════════
+       PAGE ENTRY ANIMATION
+    ══════════════════════════════════════ */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    header        { animation: fadeUp .55s var(--ease-out) .0s both; }
+    .hero-pane--idle .hero-left    { animation: fadeUp .55s var(--ease-out) .08s both; }
+    .hero-pane--idle .hero-right   { animation: fadeUp .55s var(--ease-out) .16s both; }
+    .tabs-row     { animation: fadeUp .55s var(--ease-out) .24s both; }
+    .video-grid   { animation: fadeUp .55s var(--ease-out) .32s both; }
+
+    /* ══════════════════════════════════════
+       THEME TOGGLE BUTTON
+    ══════════════════════════════════════ */
+    .btn-theme {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--r-sm);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.75);
+      cursor: pointer;
+      transition:
+        background .2s var(--ease-out),
+        border-color .2s var(--ease-out),
+        color .2s var(--ease-out),
+        transform .12s var(--ease-out);
+      flex-shrink: 0;
+    }
+    .btn-theme:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.35);
+      color: #ffffff;
+    }
+    .btn-theme:active { transform: scale(.9); }
+    .btn-theme svg { width: 18px; height: 18px; }
+    .btn-theme .icon-sun  { display: none; }
+    .btn-theme .icon-moon { display: block; }
+    body.theme-light .btn-theme .icon-sun  { display: block; }
+    body.theme-light .btn-theme .icon-moon { display: none; }
+    body.theme-light .btn-theme {
+      border-color: rgba(87, 82, 255, 0.35);
+      background: rgba(87, 82, 255, 0.06);
+      color: #5752ff;
+    }
+    body.theme-light .btn-theme:hover {
+      background: rgba(87, 82, 255, 0.12);
+      border-color: rgba(87, 82, 255, 0.6);
+    }
+
+    /* ══════════════════════════════════════
+       LIGHT THEME  (.theme-light on body)
+       Source: Figma node 308:77
+    ══════════════════════════════════════ */
+    body.theme-light {
+      background: #ffffff;
+      color: #1a1a2e;
+      transition: background .35s var(--ease-out), color .35s var(--ease-out);
+    }
+    /*
+     * 浅色模式背景分两层：
+     * ::before  → 浅色专属背景图 hero-banner-bg-light.png，opacity 0.28（与 Figma opacity-28 一致）
+     * ::after   → 白色渐变遮罩，自上而下从透明渐至纯白，覆盖图片下半部分
+     */
+    body.theme-light::before {
+      background-image: url("./hero-banner-bg-light.png");
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-position: center -420px;
+      opacity: 0.40;
+    }
+    body.theme-light::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      /*
+       * 遮罩稀释 + 上移：背景图彩色区域延伸覆盖到头部及卡片区域
+       * 0%–62%  → 完全透明，让背景色彩贯穿 header 和 hero 区域
+       * 62%–80% → 轻柔过渡到半透明白（稀释遮罩，不遮死）
+       * 80%–95% → 过渡至较浅白，底部无需全白
+       */
+      background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0)    0%,
+        rgba(255, 255, 255, 0)    62%,
+        rgba(255, 255, 255, 0.38) 78%,
+        rgba(255, 255, 255, 0.72) 92%
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+    body.theme-light .glass-overlay {
+      background: transparent; /* 浅色模式不叠白色遮罩，避免稀释背景图颜色 */
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    body.theme-light .glow-tr {
+      background: radial-gradient(
+        ellipse at 70% 20%,
+        rgba(167, 104, 255, 0.22)  0%,
+        rgba(50,  134, 255, 0.10) 45%,
+        transparent               70%
+      );
+    }
+
+    /* Header */
+    body.theme-light .btn-login {
+      color: #5752ff;
+      background-color: rgba(87, 82, 255, 0.06);
+      border-color: #5752ff;
+    }
+    body.theme-light .btn-login:hover {
+      box-shadow: 0 6px 24px rgba(87, 82, 255, 0.35);
+    }
+
+    /* Title */
+    body.theme-light .title-text__seg--mono {
+      background-image: linear-gradient(90deg, #313131 0%, #7a7a8a 100%);
+    }
+    body.theme-light .title-text__cursor {
+      background: linear-gradient(180deg, #5752ff 0%, #3286ff 45%, #00f2ff 100%);
+    }
+    body.theme-light .title-sub {
+      color: #747a87;
+    }
+
+    /* Upload card */
+    body.theme-light .upload-card {
+      /* 默认：半透明毛玻璃 */
+      background: rgba(255, 255, 255, 0.42);
+      backdrop-filter: blur(14px) saturate(1.5);
+      -webkit-backdrop-filter: blur(14px) saturate(1.5);
+      border: 2px dashed #3286ff;
+      box-shadow:
+        0 8px 32px rgba(50, 134, 255, 0.08),
+        0 1px 0 rgba(255, 255, 255, 0.85) inset;
+      transition:
+        background .25s var(--ease-out),
+        backdrop-filter .25s var(--ease-out),
+        box-shadow .25s var(--ease-out),
+        border-color .25s var(--ease-out);
+    }
+    body.theme-light .upload-card:hover {
+      /* hover：纯白 + 浅蓝阴影 */
+      background: #ffffff;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border-color: #3286ff;
+      box-shadow:
+        0 0 0 1px rgba(50, 134, 255, 0.22) inset,
+        0 0 28px rgba(50, 134, 255, 0.18),
+        0 8px 32px rgba(50, 134, 255, 0.14);
+    }
+    body.theme-light .upload-card.drag-over {
+      border-color: #5752ff;
+      background: rgba(245, 245, 255, 0.9);
+    }
+    body.theme-light .upload-main-text {
+      color: #5752ff;
+    }
+    body.theme-light .upload-formats {
+      color: #747a87;
+    }
+    body.theme-light .upload-card-title {
+      color: rgba(0,0,0,0.45);
+    }
+    body.theme-light .upload-action-btn {
+      border-color: rgba(87, 82, 255, 0.22);
+      background: rgba(87, 82, 255, 0.06);
+      color: rgba(30, 30, 60, 0.88);
+    }
+    body.theme-light .upload-action-btn:hover {
+      border-color: rgba(87, 82, 255, 0.7);
+      background: rgba(87, 82, 255, 0.12);
+      box-shadow:
+        0 0 0 1px rgba(87, 82, 255, 0.15) inset,
+        0 10px 26px rgba(87, 82, 255, 0.20);
+      color: #5752ff;
+    }
+    body.theme-light .upload-action-btn--primary {
+      background: linear-gradient(to left, #2d7aff 0%, #a768ff 100%);
+      color: #ffffff;
+      border: none;
+    }
+    body.theme-light .upload-action-btn--primary:hover {
+      background: linear-gradient(to left, #3286ff 0%, #b07aff 100%);
+      color: #ffffff;
+    }
+    body.theme-light .upload-loading {
+      background: rgba(255, 255, 255, 0.92);
+    }
+    body.theme-light .upload-loading-text {
+      color: rgba(30, 30, 60, 0.85);
+    }
+    body.theme-light .upload-loading-spinner {
+      border-color: rgba(87, 82, 255, 0.2);
+      border-top-color: #5752ff;
+    }
+
+    /* Tabs */
+    body.theme-light .tab-btn {
+      color: rgba(116, 122, 135, 0.72);
+    }
+    body.theme-light .tab-btn.active {
+      color: #5752ff;
+    }
+    body.theme-light .tab-btn.active::after {
+      background: linear-gradient(90deg, #1890ff, #5752ff);
+    }
+    body.theme-light .tab-pill.mine-tab-active #tab-more {
+      color: rgba(116, 122, 135, 0.72);
+    }
+    body.theme-light .tab-pill.mine-tab-active #tab-mine {
+      color: #5752ff;
+    }
+
+    /* Mine cards */
+    body.theme-light .mine-card {
+      background: #ffffff;
+      border-color: rgba(0, 0, 0, 0.08);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    body.theme-light .mine-card:hover {
+      background: #ffffff;
+      border-color: rgba(50, 134, 255, 0.38);
+      box-shadow:
+        0 4px 20px rgba(50, 134, 255, 0.16),
+        0 8px 32px rgba(50, 134, 255, 0.10);
+    }
+
+    /* 更多实例视频卡片 */
+    body.theme-light .v-card:hover {
+      box-shadow:
+        0 6px 24px rgba(50, 134, 255, 0.18),
+        0 12px 36px rgba(50, 134, 255, 0.12);
+      border-color: rgba(50, 134, 255, 0.30);
+    }
+
+    /* Hero 右侧大视频卡片 */
+    body.theme-light .hero-right:hover {
+      box-shadow:
+        0 6px 28px rgba(50, 134, 255, 0.20),
+        0 0 0 1px rgba(50, 134, 255, 0.22);
+    }
+
+    /* 做同款弹窗主按钮 — 用渐变色系阴影替换黑影 */
+    body.theme-light .ztk-modal-cta {
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.38);
+    }
+    body.theme-light .ztk-modal-cta:hover {
+      box-shadow: 0 8px 26px rgba(59, 130, 246, 0.50);
+    }
+    body.theme-light .ztk-modal-cta:active {
+      box-shadow: 0 3px 12px rgba(59, 130, 246, 0.32);
+    }
+
+    /* 卡片 hover 上的做同款小按钮 */
+    body.theme-light .btn-ztk-sm {
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+        0 4px 12px rgba(50, 134, 255, 0.20);
+    }
+    body.theme-light .v-card:hover .btn-ztk-sm:hover {
+      box-shadow:
+        0 0 0 1px rgba(0, 229, 255, 0.25) inset,
+        0 6px 16px rgba(50, 134, 255, 0.25);
+    }
+    body.theme-light .mine-card--draft {
+      background: rgba(255, 255, 255, 0.75);
+      border-color: rgba(87, 82, 255, 0.4);
+    }
+    body.theme-light .mine-title {
+      color: #1a1a2e;
+    }
+    body.theme-light .mine-subtitle {
+      color: rgba(30, 30, 60, 0.55);
+    }
+    body.theme-light .mine-meta,
+    body.theme-light .mine-meta-time {
+      color: rgba(30, 30, 60, 0.45);
+    }
+    body.theme-light .mine-chip {
+      border-color: rgba(0, 0, 0, 0.12);
+      color: rgba(30, 30, 60, 0.75);
+      background: rgba(0, 0, 0, 0.05);
+    }
+    body.theme-light .mine-delete-btn {
+      background: rgba(255, 77, 79, 0.08);
+      border-color: rgba(255, 77, 79, 0.3);
+      color: #e03030;
+    }
+    body.theme-light .mine-delete-btn:hover {
+      background: rgba(255, 77, 79, 0.15);
+      border-color: rgba(255, 77, 79, 0.5);
+    }
+
+    /* Modal */
+    body.theme-light .ztk-modal-backdrop {
+      background: rgba(0, 0, 0, 0.35);
+    }
+    body.theme-light .ztk-modal {
+      background: #ffffff;
+      color: #1a1a2e;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    body.theme-light .ztk-modal-videos {
+      background: #f3f4f8;
+    }
+    body.theme-light .ztk-video-label {
+      color: rgba(30, 30, 60, 0.75);
+    }
+    body.theme-light .ztk-video-frame {
+      background: #e8eaf2;
+      transition: box-shadow .2s, border-color .2s;
+    }
+    body.theme-light .ztk-video-frame:hover {
+      box-shadow:
+        0 0 0 2px rgba(50, 134, 255, 0.35),
+        0 4px 16px rgba(50, 134, 255, 0.14);
+    }
+    body.theme-light .ztk-video-progress {
+      background: rgba(0,0,0,0.1);
+    }
+    body.theme-light .ztk-video-progress-bar {
+      background: #5752ff;
+    }
+    body.theme-light .ztk-modal-title-text {
+      color: #1a1a2e;
+    }
+
+    /* Hero editor */
+    body.theme-light .hero-editor {
+      background: #f3f4f8;
+      border-color: rgba(0,0,0,0.1);
+    }
+    body.theme-light .hero-editor-top {
+      border-color: rgba(0,0,0,0.1);
+    }
+    body.theme-light .hero-editor-filename {
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-btn {
+      background: #ffffff;
+      border-color: rgba(0,0,0,0.15);
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-btn:hover {
+      border-color: rgba(0,0,0,0.3);
+    }
+    body.theme-light .hero-ed-left {
+      background: #e8eaf2;
+    }
+    body.theme-light .hero-ed-strip {
+      background: #d8dae8;
+    }
+    body.theme-light .hero-ed-timeline-meta {
+      color: #3a3a5a;
+    }
+    body.theme-light .hero-ed-right {
+      background: #f3f4f8;
+    }
+    body.theme-light .hero-ed-right-title {
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-lang-select {
+      background-color: #ffffff;
+      border-color: rgba(0,0,0,0.15);
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-spk {
+      color: rgba(30, 30, 60, 0.5);
+    }
+    body.theme-light .hero-ed-range {
+      color: rgba(30, 30, 60, 0.5);
+    }
+    body.theme-light .hero-ed-seg.is-active {
+      background: rgba(87, 82, 255, 0.08);
+    }
+    body.theme-light .hero-ed-seg.is-active .hero-ed-range {
+      color: #5752ff;
+    }
+    body.theme-light .hero-ed-text-display {
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-seg.is-active .hero-ed-text-display,
+    body.theme-light .hero-ed-seg.is-active .hero-ed-text-field {
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-text-field {
+      background: #ffffff;
+      border-color: rgba(87, 82, 255, 0.35);
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-text-btn {
+      background: #ffffff;
+      border-color: rgba(0,0,0,0.15);
+      color: #1a1a2e;
+    }
+    body.theme-light .hero-ed-hl {
+      background: rgba(87, 82, 255, 0.18);
+      color: #3a3a8a;
+    }
+
+    /* Scrollbar */
+    body.theme-light ::-webkit-scrollbar-thumb {
+      background: rgba(87, 82, 255, 0.18);
+    }
+    body.theme-light ::-webkit-scrollbar-thumb:hover {
+      background: rgba(87, 82, 255, 0.32);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Layer 1 — glass -->
+  <div class="glass-overlay"></div>
+  <!-- Layer 2 — ambient corner glows -->
+  <div class="glow-tr" aria-hidden="true"></div>
+  <div class="glow-bl" aria-hidden="true"></div>
+
+  <!-- 做同款弹窗 -->
+  <div class="ztk-modal-backdrop" id="ztkModal" aria-hidden="true">
+    <div class="ztk-modal" role="dialog" aria-modal="true">
+      <button class="ztk-modal-close" type="button" aria-label="关闭" onclick="closeZuotongkuanModal()">×</button>
+      <div class="ztk-modal-body">
+        <div class="ztk-modal-videos">
+          <div class="ztk-video">
+            <div class="ztk-video-label">原视频</div>
+            <div class="ztk-video-frame">
+              <img src="https://www.figma.com/api/mcp/asset/6682f041-5eaf-48c1-861e-887359cc091e" alt="原视频预览" />
+              <button class="ztk-video-play" type="button" aria-label="暂停">
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                  <rect x="4" y="3" width="3" height="10" rx="1" fill="currentColor"></rect>
+                  <rect x="9" y="3" width="3" height="10" rx="1" fill="currentColor"></rect>
+                </svg>
+              </button>
+            </div>
+            <div class="ztk-video-progress">
+              <div class="ztk-video-progress-bar"></div>
+            </div>
+          </div>
+          <div class="ztk-video">
+            <div class="ztk-video-label">合成后</div>
+            <div class="ztk-video-frame">
+              <img src="https://www.figma.com/api/mcp/asset/6682f041-5eaf-48c1-861e-887359cc091e" alt="合成后预览" />
+              <button class="ztk-video-play ztk-video-play--right" type="button" aria-label="播放">
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M4 2.5C4 2.10218 4.214 1.75 4.55279 1.55279C4.89157 1.35557 5.30974 1.35557 5.64853 1.55279L12 5.25C12.318 5.4409 12.5 5.76389 12.5 6.10938V9.89062C12.5 10.2361 12.318 10.5591 12 10.75L5.64853 14.4472C5.30974 14.6444 4.89157 14.6444 4.55279 14.4472C4.214 14.25 4 13.8978 4 13.5V2.5Z" fill="currentColor"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="ztk-modal-bottom">
+          <div class="ztk-modal-title-text">星期三朗诵满江红</div>
+          <button type="button" class="ztk-modal-cta" onclick="confirmZuotongkuan()">做同款</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 3 — content -->
+  <div class="page">
+
+    <!-- ═══════════ HEADER ═══════════ -->
+    <header>
+      <img
+        class="logo"
+        src="https://www.figma.com/api/mcp/asset/b07ea12c-3f40-4a73-8580-1ce9235038f9"
+        alt="讯飞智作"
+        title="返回首页"
+        onclick="resetToIdle()"
+      />
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn-theme" id="themeToggle" onclick="toggleTheme()" title="切换主题" aria-label="切换亮色/暗色主题">
+          <!-- 月亮：暗色模式显示（点击切亮色） -->
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+          </svg>
+          <!-- 太阳：亮色模式显示（点击切暗色） -->
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+        <button class="btn-login" onclick="ripple(this,event); showLoginModal()">
+          登录/注册
+        </button>
+      </div>
+    </header>
+
+    <!-- ═══════════ HERO ═══════════ -->
+    <section class="hero" id="heroSection">
+      <div class="hero-pane hero-pane--idle" id="heroPaneIdle" aria-hidden="false">
+
+        <div class="hero-left">
+
+          <div class="title-row">
+            <div class="title-star-wrap">
+              <img
+                src="./title-logo.gif"
+                alt=""
+              />
+            </div>
+            <div class="title-heading">
+              <h1 class="title-text" id="titleMainHeading" aria-label="讯飞智作，视频对口型一步到位">
+                <span class="title-text__seg title-text__seg--mono" id="titleSegMono" aria-hidden="true"></span><span class="title-text__seg title-text__seg--accent" id="titleSegAccent" aria-hidden="true"></span><span class="title-text__cursor" aria-hidden="true"></span>
+              </h1>
+              <p class="title-sub">分钟级生成，多语种真实对口型视频</p>
+            </div>
+          </div>
+
+          <div
+            class="upload-card"
+            id="uploadCard"
+            onclick="handleUploadClick()"
+            ondragover="onDragOver(event)"
+            ondragleave="onDragLeave(event)"
+            ondrop="onDrop(event)"
+          >
+            <div class="upload-inner">
+              <div class="upload-icon-area" onclick="openHeroEditor(event)" title="打开编辑器（解析完成）">
+                <img
+                  class="upload-icon"
+                  src="https://www.figma.com/api/mcp/asset/09fb52e6-b056-43ff-8841-1e2a62dadd2f"
+                  alt=""
+                />
+                <p class="upload-main-text">Click to upload your video</p>
+                <p class="upload-formats">支持mp4、mov、avi格式，大小不大于50m</p>
+              </div>
+            </div>
+            <div class="upload-loading" id="uploadLoading" aria-hidden="true" aria-live="polite">
+              <div class="upload-loading-spinner"></div>
+              <div class="upload-loading-text">
+                <span id="uploadLoadingLabel">读取中</span>
+                <span id="uploadLoadingPercent">0%</span>
+              </div>
+            </div>
+            <div class="upload-actions" role="group" aria-label="上传操作">
+              <button
+                type="button"
+                class="upload-action-btn"
+                onclick="event.stopPropagation(); ripple(this,event); handleUploadClick()"
+              >上传视频</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="hero-right" id="heroRight">
+          <img
+            class="video-img"
+            src="https://www.figma.com/api/mcp/asset/6682f041-5eaf-48c1-861e-887359cc091e"
+            alt="AI 对口型示例"
+          />
+          <div class="video-grad"></div>
+          <p class="hero-right-title">歌剧魅影男主唱海绵宝宝</p>
+
+          <div class="ctrl-top">
+            <img
+              class="icon-btn"
+              id="muteBtn"
+              src="https://www.figma.com/api/mcp/asset/fe8cfea0-a1bd-4c21-ba3f-024d00823e7a"
+              alt="静音"
+              onclick="toggleMute(event)"
+            />
+          </div>
+
+          <div class="ctrl-bottom">
+            <img
+              class="play-btn"
+              id="playBtn"
+              src="https://www.figma.com/api/mcp/asset/191a8d4b-9baf-4c86-a99a-48b21d146102"
+              alt="播放"
+              onclick="togglePlay(event)"
+            />
+            <button class="btn-ztk" onclick="ripple(this,event); handleZuotongkuan()">做同款</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="hero-pane hero-pane--editor" id="heroPaneEditor" aria-hidden="true">
+        <div class="hero-editor" role="region" aria-label="台词编辑">
+          <div class="hero-editor-top">
+            <div class="hero-editor-filename">黑色星期四.avi的合成</div>
+            <div class="hero-editor-actions">
+              <span class="hero-ed-credit-estimate">预计消耗 <b>125</b> 算力</span>
+              <button type="button" class="hero-ed-btn" onclick="closeHeroEditor()">取消合成</button>
+              <button type="button" class="hero-ed-btn">暂存草稿</button>
+              <button type="button" class="hero-ed-btn hero-ed-btn--primary" onclick="showToast('任务已提交（Demo）')">开始合成</button>
+            </div>
+          </div>
+          <div class="hero-editor-body">
+            <div class="hero-ed-left">
+              <div class="hero-ed-video">
+                <img src="https://www.figma.com/api/mcp/asset/aef92e72-624d-4b09-b29a-36bc61c42a2c" alt="" />
+              </div>
+              <div class="hero-ed-timeline-meta">
+                <div class="hero-ed-transport-row">
+                  <span class="hero-ed-time">00:00:07:02<span class="muted">/00:00:45:01</span></span>
+                  <span class="hero-ed-play" role="button" tabindex="0" aria-label="播放">▶</span>
+                  <span class="hero-ed-fullscreen" aria-hidden="true">⛶</span>
+                </div>
+              </div>
+              <div class="hero-ed-strip">
+                <img src="https://www.figma.com/api/mcp/asset/33437ffd-e4fc-4908-a58b-6594bbfd902b" alt="" />
+              </div>
+            </div>
+            <div class="hero-ed-right">
+              <div class="hero-ed-right-head">
+                <div class="hero-ed-right-title">对话解析</div>
+                <label class="visually-hidden" for="heroEdLang">目标语言</label>
+                <select class="hero-ed-lang-select" id="heroEdLang" aria-label="目标语言">
+                  <option value="ZH">中文 · ZH</option>
+                  <option value="EN">英语 · EN</option>
+                  <option value="JA">日语 · JA</option>
+                  <option value="RU">俄语 · RU</option>
+                  <option value="KO">韩语 · KO</option>
+                  <option value="AR">阿拉伯语 · AR</option>
+                  <option value="ES">西班牙语 · ES</option>
+                  <option value="YUE">粤语 · YUE</option>
+                </select>
+              </div>
+
+              <article class="hero-ed-seg">
+                <div class="hero-ed-seg-head">
+                  <div class="hero-ed-spk">
+                    <span class="hero-ed-avatar"><img src="https://www.figma.com/api/mcp/asset/f68fd089-2a0b-4c0b-920a-dc9226ce551e" alt="" /></span>
+                    Speaker 1
+                  </div>
+                  <span class="hero-ed-range-wrap">
+                    <span class="hero-ed-range">00:15—00:45</span>
+                    <button type="button" class="hero-ed-range-play" aria-label="播放片段 00:15—00:45" onclick="showToast('从 00:15 播放（Demo）')">
+                      <svg viewBox="0 0 15 17" fill="none" aria-hidden="true"><path d="M1 1L14 8.5L1 16V1Z" fill="currentColor"/></svg>
+                    </button>
+                  </span>
+                </div>
+                <div class="hero-ed-text-block">
+                  <div class="hero-ed-text-display" tabindex="0" aria-label="台词，点击或按 Enter 编辑">Sometimes you have to let go of what you think you want, to make room for what you’re actually meant to have.</div>
+                  <textarea class="hero-ed-text-field" rows="4" aria-label="编辑台词内容"></textarea>
+                  <div class="hero-ed-text-toolbar">
+                    <button type="button" class="hero-ed-text-btn hero-ed-text-save">保存</button>
+                    <button type="button" class="hero-ed-text-btn hero-ed-text-cancel">取消</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="hero-ed-seg is-active">
+                <div class="hero-ed-seg-head">
+                  <div class="hero-ed-spk">
+                    <span class="hero-ed-avatar"><img src="https://www.figma.com/api/mcp/asset/99997fd5-8f0d-4016-b6d1-05eb90119de6" alt="" /></span>
+                    Speaker 2
+                  </div>
+                  <span class="hero-ed-range-wrap">
+                    <span class="hero-ed-range">01:04—01:45</span>
+                    <button type="button" class="hero-ed-range-play" aria-label="播放片段 01:04—01:45" onclick="showToast('从 01:04 播放（Demo）')">
+                      <svg viewBox="0 0 15 17" fill="none" aria-hidden="true"><path d="M1 1L14 8.5L1 16V1Z" fill="currentColor"/></svg>
+                    </button>
+                  </span>
+                </div>
+                <div class="hero-ed-text-block">
+                  <div class="hero-ed-text-display" tabindex="0" aria-label="台词，点击或按 Enter 编辑"><span class="hero-ed-hl">Sometimes</span> you have to let go of what you think you want, to make room for what you’re actually meant to have.</div>
+                  <textarea class="hero-ed-text-field" rows="4" aria-label="编辑台词内容"></textarea>
+                  <div class="hero-ed-text-toolbar">
+                    <button type="button" class="hero-ed-text-btn hero-ed-text-save">保存</button>
+                    <button type="button" class="hero-ed-text-btn hero-ed-text-cancel">取消</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="hero-ed-seg">
+                <div class="hero-ed-seg-head">
+                  <div class="hero-ed-spk">
+                    <span class="hero-ed-avatar"><img src="https://www.figma.com/api/mcp/asset/f68fd089-2a0b-4c0b-920a-dc9226ce551e" alt="" /></span>
+                    Speaker 1
+                  </div>
+                  <span class="hero-ed-range-wrap">
+                    <span class="hero-ed-range">00:15—00:45</span>
+                    <button type="button" class="hero-ed-range-play" aria-label="播放片段 00:15—00:45" onclick="showToast('从 00:15 播放（Demo）')">
+                      <svg viewBox="0 0 15 17" fill="none" aria-hidden="true"><path d="M1 1L14 8.5L1 16V1Z" fill="currentColor"/></svg>
+                    </button>
+                  </span>
+                </div>
+                <div class="hero-ed-text-block">
+                  <div class="hero-ed-text-display" tabindex="0" aria-label="台词，点击或按 Enter 编辑">Well beastard</div>
+                  <textarea class="hero-ed-text-field" rows="4" aria-label="编辑台词内容"></textarea>
+                  <div class="hero-ed-text-toolbar">
+                    <button type="button" class="hero-ed-text-btn hero-ed-text-save">保存</button>
+                    <button type="button" class="hero-ed-text-btn hero-ed-text-cancel">取消</button>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ═══════════ TABS ═══════════ -->
+    <div class="tabs-row">
+      <div class="tab-pill" id="tabPill">
+        <button class="tab-btn active" id="tab-more" onclick="switchTab('more',this)">更多实例</button>
+        <button class="tab-btn"        id="tab-mine" onclick="switchTab('mine',this)">我的合成</button>
+      </div>
+    </div>
+
+    <!-- ═══════════ 更多实例 ═══════════ -->
+    <div class="tab-panel" id="tabPanelMore" role="tabpanel">
+      <div class="video-grid" id="videoGrid"></div>
+    </div>
+
+    <!-- ═══════════ 我的合成（Figma 307:238 最新版） ═══════════ -->
+    <div class="tab-panel" id="tabPanelMine" role="tabpanel" hidden>
+      <div class="mine-grid">
+        <!-- 草稿：等待合成 -->
+        <article class="mine-card mine-card--draft">
+          <div class="mine-thumb">
+            <img src="https://www.figma.com/api/mcp/asset/5243138b-8ff3-4694-83e7-daa9889771d3" alt="" />
+          </div>
+          <div class="mine-body">
+            <h3 class="mine-title">黑色星期四.avi的合成</h3>
+            <p class="mine-subtitle">保存草稿等待合成</p>
+            <div class="mine-actions">
+              <button class="mine-btn mine-btn--primary">继续编辑</button>
+              <button class="mine-delete-btn">删除</button>
+            </div>
+          </div>
+          <div class="mine-meta">
+            <span class="mine-meta-time">3.31 14:25</span>
+          </div>
+        </article>
+
+        <!-- 合成中 -->
+        <article class="mine-card">
+          <div class="mine-thumb">
+            <img src="https://www.figma.com/api/mcp/asset/5243138b-8ff3-4694-83e7-daa9889771d3" alt="" />
+          </div>
+          <div class="mine-body">
+            <h3 class="mine-title">黑色星期四.avi的合成</h3>
+            <div class="mine-status-row">
+              <span class="mine-chip mine-chip--primary">合成中 预计21分钟</span>
+              <span class="mine-chip">英文</span>
+              <span class="mine-chip">1m14s</span>
+            </div>
+            <div class="mine-actions">
+              <button class="mine-btn">编辑</button>
+              <button class="mine-btn mine-btn--download">下载</button>
+              <button class="mine-delete-btn">删除</button>
+            </div>
+          </div>
+          <div class="mine-meta">
+            <span class="mine-meta-time">3.31 14:25</span>
+          </div>
+        </article>
+
+        <!-- 合成错误 -->
+        <article class="mine-card">
+          <div class="mine-thumb">
+            <img src="https://www.figma.com/api/mcp/asset/5243138b-8ff3-4694-83e7-daa9889771d3" alt="" />
+          </div>
+          <div class="mine-body">
+            <h3 class="mine-title">黑色星期四.avi的合成</h3>
+            <div class="mine-status-row">
+              <span class="mine-chip mine-chip--danger">合成错误</span>
+            </div>
+            <div class="mine-actions">
+              <button class="mine-btn mine-btn--primary">重试</button>
+              <button class="mine-delete-btn">删除</button>
+            </div>
+          </div>
+          <div class="mine-meta">
+            <span class="mine-meta-time">3.31 14:25</span>
+          </div>
+        </article>
+
+        <!-- 合成成功 -->
+        <article class="mine-card">
+          <div class="mine-thumb">
+            <img src="https://www.figma.com/api/mcp/asset/5243138b-8ff3-4694-83e7-daa9889771d3" alt="" />
+          </div>
+          <div class="mine-body">
+            <h3 class="mine-title">黑色星期四.avi的合成</h3>
+            <div class="mine-status-row">
+              <span class="mine-chip mine-chip--success">合成成功</span>
+              <span class="mine-chip">英文</span>
+              <span class="mine-chip">1m14s</span>
+            </div>
+            <div class="mine-actions">
+              <button class="mine-btn">编辑</button>
+              <button class="mine-btn mine-btn--download">下载</button>
+              <button class="mine-delete-btn">删除</button>
+            </div>
+          </div>
+          <div class="mine-meta">
+            <span class="mine-meta-time">3.31 14:25</span>
+          </div>
+        </article>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* ─── Theme Toggle ─── */
+    /* 各主题下的资源路径 */
+    const THEME_ASSETS = {
+      dark: {
+        logo:       'https://www.figma.com/api/mcp/asset/b07ea12c-3f40-4a73-8580-1ce9235038f9',
+        uploadIcon: 'https://www.figma.com/api/mcp/asset/09fb52e6-b056-43ff-8841-1e2a62dadd2f',
+        htmlBg:     '#030a1a',
+      },
+      light: {
+        logo:       './logo-light.png',
+        uploadIcon: './upload-icon-light.svg',
+        htmlBg:     '#ffffff',
+      },
+    };
+
+    function applyThemeAssets(isLight) {
+      const mode = isLight ? 'light' : 'dark';
+      const assets = THEME_ASSETS[mode];
+      /* html 背景色（防止右侧条纹） */
+      document.documentElement.style.background = assets.htmlBg;
+      /* header logo */
+      const logo = document.querySelector('.logo');
+      if (logo) logo.src = assets.logo;
+      /* upload icon */
+      const uploadIcon = document.querySelector('.upload-icon');
+      if (uploadIcon) uploadIcon.src = assets.uploadIcon;
+    }
+
+    (function initTheme() {
+      const saved = localStorage.getItem('xfzz-theme');
+      const isLight = saved === 'light';
+      if (isLight) document.body.classList.add('theme-light');
+      applyThemeAssets(isLight);
+    })();
+
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('theme-light');
+      localStorage.setItem('xfzz-theme', isLight ? 'light' : 'dark');
+      applyThemeAssets(isLight);
+    }
+
+    /* ─── Ripple ─── */
+    function ripple(el, e) {
+      const r = el.getBoundingClientRect();
+      const dot = document.createElement('span');
+      dot.className = 'ripple';
+      const sz = Math.max(r.width, r.height);
+      Object.assign(dot.style, {
+        width: sz+'px', height: sz+'px',
+        left: (e.clientX - r.left - sz/2)+'px',
+        top:  (e.clientY - r.top  - sz/2)+'px'
+      });
+      el.appendChild(dot);
+      dot.addEventListener('animationend', () => dot.remove());
+    }
+
+    /* ─── Hero：idle ↔ 编辑器 ─── */
+    function openHeroEditor(e) {
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+      const hero = document.getElementById('heroSection');
+      hero.classList.add('hero--editing');
+      document.getElementById('heroPaneIdle').setAttribute('aria-hidden', 'true');
+      document.getElementById('heroPaneEditor').setAttribute('aria-hidden', 'false');
+    }
+
+    function closeHeroEditor() {
+      const hero = document.getElementById('heroSection');
+      hero.classList.remove('hero--editing');
+      document.getElementById('heroPaneIdle').setAttribute('aria-hidden', 'false');
+      document.getElementById('heroPaneEditor').setAttribute('aria-hidden', 'true');
+    }
+
+    let uploadLoadingTimer;
+    function handleUploadClick() {
+      const overlay = document.getElementById('uploadLoading');
+      const percentEl = document.getElementById('uploadLoadingPercent');
+      const labelEl = document.getElementById('uploadLoadingLabel');
+      if (!overlay || !percentEl) {
+        openHeroEditor();
+        return;
+      }
+      if (uploadLoadingTimer) {
+        clearInterval(uploadLoadingTimer);
+      }
+      overlay.classList.add('is-active');
+      overlay.setAttribute('aria-hidden', 'false');
+      if (labelEl) labelEl.textContent = '读取中';
+      let p = 0;
+      percentEl.textContent = '0%';
+      uploadLoadingTimer = setInterval(() => {
+        p += Math.floor(Math.random() * 10) + 5;
+        if (p >= 100) p = 100;
+        percentEl.textContent = p + '%';
+        if (p >= 100) {
+          clearInterval(uploadLoadingTimer);
+          setTimeout(() => {
+            overlay.classList.remove('is-active');
+            overlay.setAttribute('aria-hidden', 'true');
+            openHeroEditor();
+          }, 400);
+        }
+      }, 160);
+    }
+    function onDragOver(e) { e.preventDefault(); document.getElementById('uploadCard').classList.add('drag-over'); }
+    function onDragLeave()  { document.getElementById('uploadCard').classList.remove('drag-over'); }
+    function onDrop(e) {
+      e.preventDefault();
+      onDragLeave();
+      handleUploadClick();
+    }
+
+    let playing = false;
+    function togglePlay(e) {
+      e.stopPropagation();
+      playing = !playing;
+      const btn = document.getElementById('playBtn');
+      btn.style.opacity = '.4';
+      setTimeout(() => btn.style.opacity = '', 180);
+    }
+    function toggleMute(e) { e.stopPropagation(); }
+
+    /* ─── 做同款 ─── */
+    function openZuotongkuanModal() {
+      const modal = document.getElementById('ztkModal');
+      if (!modal) return;
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+    function closeZuotongkuanModal() {
+      const modal = document.getElementById('ztkModal');
+      if (!modal) return;
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    function confirmZuotongkuan() {
+      closeZuotongkuanModal();
+      showLoginModal();
+    }
+    function handleZuotongkuan() {
+      openZuotongkuanModal();
+    }
+    function showLoginModal()    { showToast('登录/注册功能即将上线 🚀'); }
+    function resetToIdle() {
+      closeHeroEditor();
+      switchTab('more', document.getElementById('tab-more'));
+    }
+
+    /* ─── 台词块：点击编辑、保存 / 取消（Demo） ─── */
+    function initHeroEdTextEditors() {
+      document.querySelectorAll('.hero-ed-text-block').forEach(block => {
+        const display = block.querySelector('.hero-ed-text-display');
+        const field = block.querySelector('.hero-ed-text-field');
+        const btnSave = block.querySelector('.hero-ed-text-save');
+        const btnCancel = block.querySelector('.hero-ed-text-cancel');
+        let backup = display.innerHTML;
+
+        function closeEdit() {
+          block.classList.remove('is-editing');
+        }
+
+        function autoResizeField() {
+          field.style.height = 'auto';
+          field.style.height = Math.max(72, field.scrollHeight) + 'px';
+        }
+
+        function openEdit() {
+          document.querySelectorAll('.hero-ed-text-block.is-editing').forEach(b => {
+            if (b !== block) b.querySelector('.hero-ed-text-cancel').click();
+          });
+          backup = display.innerHTML;
+          field.value = display.innerText.replace(/\u00a0/g, ' ').trim();
+          block.classList.add('is-editing');
+          field.focus();
+          autoResizeField();
+        }
+
+        function save() {
+          const v = field.value.trim();
+          display.textContent = v;
+          backup = display.innerHTML;
+          closeEdit();
+          showToast('台词已保存');
+        }
+
+        function cancel() {
+          display.innerHTML = backup;
+          closeEdit();
+        }
+
+        display.addEventListener('click', e => {
+          e.stopPropagation();
+          openEdit();
+        });
+        display.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openEdit();
+          }
+        });
+        btnSave.addEventListener('click', e => {
+          e.stopPropagation();
+          save();
+        });
+        btnCancel.addEventListener('click', e => {
+          e.stopPropagation();
+          cancel();
+        });
+        field.addEventListener('keydown', e => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            cancel();
+          }
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            save();
+          }
+        });
+        field.addEventListener('input', autoResizeField);
+      });
+    }
+
+    initHeroEdTextEditors();
+
+    /* ─── 主标题：打字机 + 分段渐变 ─── */
+    (function initTitleTypewriter() {
+      const monoEl = document.getElementById('titleSegMono');
+      const accentEl = document.getElementById('titleSegAccent');
+      if (!monoEl || !accentEl) return;
+      const part1 = '讯飞智作';
+      const part2 = '，视频对口型一步到位';
+      const total = part1.length + part2.length;
+      let idx = 0;
+      const delayMono = 95;
+      const delayAccent = 72;
+      const pauseBetweenLoops = 2000;
+      function tick() {
+        idx++;
+        if (idx <= part1.length) {
+          monoEl.textContent = part1.slice(0, idx);
+        } else if (idx <= total) {
+          monoEl.textContent = part1;
+          accentEl.textContent = part2.slice(0, idx - part1.length);
+        }
+        if (idx < total) {
+          setTimeout(tick, idx < part1.length ? delayMono : delayAccent);
+        } else {
+          setTimeout(() => {
+            monoEl.textContent = '';
+            accentEl.textContent = '';
+            idx = 0;
+            tick();
+          }, pauseBetweenLoops);
+        }
+      }
+      tick();
+    })();
+
+    /* ─── Tabs：更多实例 ↔ 我的合成 ─── */
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const pill = document.getElementById('tabPill');
+      const panelMore = document.getElementById('tabPanelMore');
+      const panelMine = document.getElementById('tabPanelMine');
+
+      if (name === 'mine') {
+        pill.classList.add('mine-tab-active');
+        panelMore.hidden = true;
+        panelMine.hidden = false;
+      } else {
+        pill.classList.remove('mine-tab-active');
+        panelMore.hidden = false;
+        panelMine.hidden = true;
+      }
+    }
+
+    /* ─── Video grid ─── */
+    const CARDS = [
+      { lang:'EN', cat:'短剧',     dub:'霸道总裁一张嘴，蜡笔小新跑断腿' },
+      { lang:'JA', cat:'教育培训', dub:'甄嬛在直播间喊「家人们上链接」' },
+      { lang:'KO', cat:'品牌营销', dub:'毒液播报天气：今天适合搞事' },
+      { lang:'RU', cat:'个人演讲', dub:'李白现场 freestyle《静夜思》' },
+      { lang:'ES', cat:'广告营销', dub:'张飞轻声 ASMR：俺也一样…' },
+      { lang:'EN', cat:'短剧',     dub:'马斯克用京剧念白发射火箭' },
+    ];
+    const THUMBS = [
+      './vcard-1.png',
+      './vcard-2.png',
+      './vcard-3.png',
+      './vcard-4.png',
+      './vcard-5.png',
+      './vcard-6.png',
+    ];
+    const grid  = document.getElementById('videoGrid');
+
+    CARDS.forEach(({ lang, cat, dub }, i) => {
+      const d = document.createElement('div');
+      d.className = 'v-card';
+      d.innerHTML = `
+        <img src="${THUMBS[i] ?? THUMBS[0]}" alt="示例视频 ${i+1}" loading="lazy" />
+        <div class="vcard-top-tags">
+          <div class="vtag">
+            <span class="vtag-lang">${lang}</span>
+            <span class="vtag-cat">${cat}</span>
+          </div>
+        </div>
+        <div class="vcard-overlay"></div>
+        <div class="vcard-play">
+          <div class="vcard-play-icon">
+            <svg width="15" height="17" viewBox="0 0 15 17" fill="none">
+              <path d="M1 1L14 8.5L1 16V1Z" fill="white" stroke="white" stroke-width="1.4" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="vcard-footer">
+          <button class="btn-ztk-sm" data-idx="${i}">做同款</button>
+          <p class="vcard-dub-title">${dub}</p>
+        </div>`;
+
+      /* card-level click (not from the button) */
+      d.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-ztk-sm')) return;
+        d.style.transition = 'transform .1s';
+        d.style.transform  = 'scale(.96)';
+        setTimeout(() => { d.style.transform = ''; d.style.transition = ''; }, 180);
+        showToast('点击「做同款」可一键复用此案例 ▶');
+      });
+
+      /* 做同款 button ripple + action */
+      const ztkBtn = d.querySelector('.btn-ztk-sm');
+      ztkBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ripple(ztkBtn, e);
+        handleZuotongkuan();
+      });
+
+      grid.appendChild(d);
+    });
+
+    /* ─── Toast ─── */
+    let toastTimer;
+    function showToast(msg) {
+      let t = document.getElementById('_toast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = '_toast';
+        Object.assign(t.style, {
+          position:'fixed', bottom:'36px', left:'50%',
+          transform:'translateX(-50%) translateY(0)',
+          background:'rgba(13,15,20,.92)',
+          border:'1px solid rgba(0,242,234,.28)',
+          color:'#fff', fontSize:'14px',
+          padding:'11px 22px', borderRadius:'10px',
+          backdropFilter:'blur(12px)',
+          zIndex:'9999', whiteSpace:'nowrap',
+          boxShadow:'0 4px 24px rgba(0,242,234,.18)',
+          letterSpacing:'.2px',
+          transition:'opacity .3s, transform .3s'
+        });
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.opacity = '1';
+      t.style.transform = 'translateX(-50%) translateY(0)';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateX(-50%) translateY(8px)';
+      }, 2600);
+    }
+  </script>
+</body>
+</html>
